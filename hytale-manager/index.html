@@ -31,6 +31,8 @@
                 <div class="controls">
                     <button id="startButton">Start Server</button>
                     <button id="stopButton">Stop Server</button>
+                    <button id="backupButton" style="background-color: #007acc; margin-left: 10px;">Backup World</button>
+                    <button id="deleteButton" style="background-color: #555; margin-left: 10px;">Delete Server</button>
                 </div>
             </header>
     
@@ -55,7 +57,10 @@
                 <input type="text" id="serverNameInput" required placeholder="e.g., My Survival World">
                 
                 <label for="serverPath">Server Path</label>
-                <input type="text" id="serverPathInput" required placeholder="e.g., C:\\HytaleServers\\Survival">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="serverPathInput" required placeholder="e.g., C:\HytaleServers\Survival" style="flex-grow: 1;">
+                    <button type="button" id="browseBtn" style="padding: 0 15px; cursor: pointer;">Browse...</button>
+                </div>
                 
                 <label for="jarFile">JAR File Name</label>
                 <input type="text" id="jarFileInput" required value="hytale-server.jar">
