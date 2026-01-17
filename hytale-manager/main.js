@@ -3,6 +3,23 @@ const path = require('path');
 const fs = require('fs/promises');
 const { spawn } = require('child_process');
 
+// Add this helper function at the top of main.js
+function getJavaPath() {
+    // 1. Check for a bundled JRE inside the app folder
+    const bundledPath = path.join(__dirname, 'jre', 'bin', 'java.exe'); // Use 'java' on Mac/Linux
+    
+    // Check if bundled java exists (using synchronous check for simplicity here, or async if preferred)
+    // Note: In production (packaged app), path handling might differ slightly depending on where you unpack resources.
+    try {
+        require('fs').accessSync(bundledPath);
+        console.log('[Manager] Using bundled Java:', bundledPath);
+        return bundledPath;
+    } catch (e) {
+        console.log('[Manager] Bundled Java not found, falling back to system "java"');
+        return 'java'; // Fallback to system PATH
+    }
+}
+
 const SERVERS_CONFIG_PATH = path.join(app.getPath('userData'), 'servers.json');
 const runningServers = new Map();
 let mainWindow;
@@ -119,11 +136,14 @@ ipcMain.on('start-server', async (event, serverId) => {
     }
     
     const args = (serverConfig.javaArgs || '').split(' ').filter(Boolean);
-    const serverProcess = spawn('java', [...args, '-jar', serverConfig.jarFile], { cwd: serverConfig.path });
+    
+    // UPDATED: Use our smart java path finder
+    const javaExecutable = serverConfig.javaPath || getJavaPath(); 
+    
+    const serverProcess = spawn(javaExecutable, [...args, '-jar', serverConfig.jarFile], { cwd: serverConfig.path });
     
     runningServers.set(serverId, serverProcess);
     mainWindow.webContents.send('server-state-change', { serverId, isRunning: true });
-    mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Starting server...\n' });
 
     serverProcess.stdout.on('data', (data) => mainWindow.webContents.send('server-log', { serverId, log: data.toString() }));
     serverProcess.stderr.on('data', (data) => mainWindow.webContents.send('server-log', { serverId, log: `[STDERR] ${data.toString()}` }));

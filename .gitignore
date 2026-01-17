@@ -1,2 +1,29 @@
-# Ignore bundled JRE
-/jre
+# --- Dependencies ---
+node_modules/
+**/node_modules/
+
+# --- Build Outputs (Electron Forge) ---
+out/
+**/out/
+dist/
+build/
+
+# --- Bundled Java Runtime ---
+# We ignore this so we don't upload 300MB of Java to GitHub
+jre/
+**/jre/
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+*.log
+
+# --- VS Code Settings ---
+# You usually want to ignore personal workspace settings
+.vscode/
+# But keep launch configurations if you want to share them:
+!.vscode/launch.json
+
+# --- User Data ---
+# Ignore the local server list so your personal saves aren't committed
+**/servers.json
