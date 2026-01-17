@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self';">
+    <title>Hytale Server Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="main-grid">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Servers</h2>
+                <button id="addServerBtn" class="add-btn">+</button>
+            </div>
+            <ul id="serverList" class="server-list">
+                <!-- Server items will be dynamically inserted here -->
+            </ul>
+        </aside>
+
+        <div id="welcomeView" class="welcome-view">
+            <h2>Welcome to Hytale Server Manager</h2>
+            <p>Select a server from the list to get started, or add a new one.</p>
+            <button id="initialAddServerBtn">Add Your First Server</button>
+        </div>
+        
+        <div id="serverView" class="server-view" style="display: none;">
+            <header class="header">
+                <h1 id="serverNameTitle"></h1>
+                <div class="controls">
+                    <button id="startButton">Start Server</button>
+                    <button id="stopButton">Stop Server</button>
+                </div>
+            </header>
+    
+            <main class="console-container">
+                <pre id="console" class="console"></pre>
+            </main>
+    
+            <footer class="footer">
+                <input type="text" id="commandInput" placeholder="Enter server command and press Enter...">
+            </footer>
+        </div>
+    </div>
+
+    <!-- Add/Edit Server Modal -->
+    <div id="serverModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modalTitle">Add a New Server</h2>
+            <form id="serverForm">
+                <input type="hidden" id="serverId">
+                <label for="serverName">Server Name</label>
+                <input type="text" id="serverNameInput" required placeholder="e.g., My Survival World">
+                
+                <label for="serverPath">Server Path</label>
+                <input type="text" id="serverPathInput" required placeholder="e.g., C:\\HytaleServers\\Survival">
+                
+                <label for="jarFile">JAR File Name</label>
+                <input type="text" id="jarFileInput" required value="hytale-server.jar">
+
+                <label for="javaArgs">Java Arguments (optional)</label>
+                <input type="text" id="javaArgsInput" placeholder="-Xmx4G -Xms4G">
+                
+                <button type="submit" id="saveServerBtn">Save Server</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="./renderer.js"></script>
+</body>
+</html>
