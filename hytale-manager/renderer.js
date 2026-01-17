@@ -16,7 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const commandInput = document.getElementById('commandInput');
     const consoleDiv = document.getElementById('console');
     const serverNameTitle = document.getElementById('serverNameTitle');
-    const deleteButton = document.getElementById('deleteButton'); // NEW
+    const backupButton = document.getElementById('backupButton');
+    const deleteButton = document.getElementById('deleteButton'); 
 
     // Modal Elements
     const modal = document.getElementById('serverModal');
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const jarFileInput = document.getElementById('jarFileInput');
     const javaArgsInput = document.getElementById('javaArgsInput');
     const javaPathInput = document.getElementById('javaPathInput');
-    const browseBtn = document.getElementById('browseBtn'); // NEW
+    const browseBtn = document.getElementById('browseBtn');
 
     // --- UI Update Functions ---
 
@@ -52,11 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.classList.add('active');
             }
             
-            // NEW: Double-click to open folder
             li.addEventListener('dblclick', () => {
                 window.electronAPI.openFolder(server.path);
             });
-            li.title = "Double-click to open server folder"; // NEW: Tooltip
+            li.title = "Double-click to open server folder";
 
             serverList.appendChild(li);
         });
@@ -127,27 +127,39 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === modal) hideModal();
     });
 
-    // NEW: Browse for server path
-    browseBtn.addEventListener('click', async () => {
-        const path = await window.electronAPI.selectDirectory();
-        if (path) {
-            serverPathInput.value = path;
-        }
-    });
-    
-    // NEW: Delete server
-    deleteButton.addEventListener('click', async () => {
-        if (!activeServerId) return;
+    if(browseBtn) {
+        browseBtn.addEventListener('click', async () => {
+            const path = await window.electronAPI.selectDirectory();
+            if (path) serverPathInput.value = path;
+        });
+    }
 
-        const confirmDelete = confirm("Are you sure you want to delete this server from the manager?");
-        if (confirmDelete) {
-            await window.electronAPI.deleteServer(activeServerId);
+    if(deleteButton) {
+        deleteButton.addEventListener('click', async () => {
+            if (!activeServerId) return;
+            if (confirm("Permanently remove this server from the manager? (Files will remain)")) {
+                await window.electronAPI.deleteServer(activeServerId);
+                activeServerId = null;
+                loadServers();
+            }
+        });
+    }
+
+    if(backupButton) {
+        backupButton.addEventListener('click', async () => {
+            if (!activeServerId) return;
             
-            // Reset UI
-            activeServerId = null;
-            loadServers(); // Reloads the list
-        }
-    });
+            backupButton.disabled = true;
+            backupButton.textContent = "Backing up...";
+            
+            const result = await window.electronAPI.backupServer(activeServerId);
+            
+            alert(result.message);
+            
+            backupButton.disabled = false;
+            backupButton.textContent = "Backup World";
+        });
+    }
 
     serverForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -200,7 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const state = serverStates.get(serverId);
         state.console += log;
         
-        // Prune console if it gets too long to prevent memory issues
         if (state.console.length > 20000) {
             state.console = state.console.substring(state.console.length - 15000);
         }
@@ -230,7 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // If there's no active server or the active one was deleted, select the first one.
         if (servers.length > 0 && (!activeServerId || !servers.find(s => s.id === activeServerId))) {
             activeServerId = servers[0].id;
         } else if (servers.length === 0) {
