@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const commandInput = document.getElementById('commandInput');
     const consoleDiv = document.getElementById('console');
     const serverNameTitle = document.getElementById('serverNameTitle');
+    const deleteButton = document.getElementById('deleteButton'); // NEW
 
     // Modal Elements
     const modal = document.getElementById('serverModal');
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const jarFileInput = document.getElementById('jarFileInput');
     const javaArgsInput = document.getElementById('javaArgsInput');
     const javaPathInput = document.getElementById('javaPathInput');
+    const browseBtn = document.getElementById('browseBtn'); // NEW
 
     // --- UI Update Functions ---
 
@@ -49,6 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (server.id === activeServerId) {
                 li.classList.add('active');
             }
+            
+            // NEW: Double-click to open folder
+            li.addEventListener('dblclick', () => {
+                window.electronAPI.openFolder(server.path);
+            });
+            li.title = "Double-click to open server folder"; // NEW: Tooltip
+
             serverList.appendChild(li);
         });
     }
@@ -116,6 +125,28 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModalBtn.addEventListener('click', hideModal);
     window.addEventListener('click', (e) => {
         if (e.target === modal) hideModal();
+    });
+
+    // NEW: Browse for server path
+    browseBtn.addEventListener('click', async () => {
+        const path = await window.electronAPI.selectDirectory();
+        if (path) {
+            serverPathInput.value = path;
+        }
+    });
+    
+    // NEW: Delete server
+    deleteButton.addEventListener('click', async () => {
+        if (!activeServerId) return;
+
+        const confirmDelete = confirm("Are you sure you want to delete this server from the manager?");
+        if (confirmDelete) {
+            await window.electronAPI.deleteServer(activeServerId);
+            
+            // Reset UI
+            activeServerId = null;
+            loadServers(); // Reloads the list
+        }
     });
 
     serverForm.addEventListener('submit', async (e) => {
