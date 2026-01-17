@@ -128,6 +128,34 @@ ipcMain.on('open-folder', (event, folderPath) => {
     shell.openPath(folderPath);
 });
 
+// --- Backup Logic ---
+ipcMain.handle('backup-server', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return { success: false, message: 'Server not found' };
+
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupName = `${server.name.replace(/\s+/g, '_')}_Backup_${timestamp}`;
+        // Create a 'backups' folder inside the server folder
+        const backupDir = path.join(server.path, 'backups', backupName);
+        
+        // We exclude the 'backups' folder itself from the copy to prevent infinite recursion
+        // A simple way is to just copy the 'world' folder if Hytale uses that standard
+        // For robustness, let's backup the whole folder but skip 'backups'
+        // (Note: Node.js fs.cp is recursive by default)
+        
+        await fs.cp(server.path, backupDir, { 
+            recursive: true, 
+            filter: (src) => !src.includes('backups') && !src.includes('hytale-server.jar') // Skip large jar and backups
+        });
+
+        return { success: true, message: `Backup created at: ${backupDir}` };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
 
 // --- Server Interaction IPC ---
 
@@ -160,7 +188,15 @@ ipcMain.on('start-server', async (event, serverId) => {
     serverProcess.stderr.on('data', (data) => mainWindow.webContents.send('server-log', { serverId, log: `[STDERR] ${data.toString()}` }));
 
     serverProcess.on('close', (code) => {
-        mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Server stopped. Exit code: ${code}.\n` });
+        let msg = `[Manager] Server stopped. Exit code: ${code}.\n`;
+        
+        // ROBUSTNESS CHECK: Code 0 is normal. Anything else is usually a crash.
+        if (code !== 0 && code !== null) {
+            msg += `[ALERT] Server crashed or stopped unexpectedly! Check logs above.\n`;
+            // Optional: You could trigger an auto-restart here if you wanted.
+        }
+        
+        mainWindow.webContents.send('server-log', { serverId, log: msg });
         mainWindow.webContents.send('server-state-change', { serverId, isRunning: false });
         runningServers.delete(serverId);
     });
