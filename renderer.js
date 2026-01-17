@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const serverPathInput = document.getElementById('serverPathInput');
     const jarFileInput = document.getElementById('jarFileInput');
     const javaArgsInput = document.getElementById('javaArgsInput');
+    const javaPathInput = document.getElementById('javaPathInput');
 
     // --- UI Update Functions ---
 
@@ -90,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
             serverPathInput.value = server.path;
             jarFileInput.value = server.jarFile;
             javaArgsInput.value = server.javaArgs || '';
+            javaPathInput.value = server.javaPath || '';
         } else {
             modalTitle.textContent = 'Add a New Server';
             serverIdInput.value = '';
@@ -123,7 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
             name: serverNameInput.value,
             path: serverPathInput.value,
             jarFile: jarFileInput.value,
-            javaArgs: javaArgsInput.value
+            javaArgs: javaArgsInput.value,
+            javaPath: javaPathInput.value
         };
 
         if (serverData.id) { // Update existing
