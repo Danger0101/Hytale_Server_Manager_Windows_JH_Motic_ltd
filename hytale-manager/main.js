@@ -1,22 +1,23 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const path = require('path');
-const fs = require('fs/promises');
-const { spawn } = require('child_process');
+// --- Add this helper function at the very top of main.js ---
+function getJavaExecutable(serverConfig) {
+    // 1. If user manually typed a path in settings, use that
+    if (serverConfig.javaPath && serverConfig.javaPath.trim() !== "") {
+        return serverConfig.javaPath;
+    }
 
-// Add this helper function at the top of main.js
-function getJavaPath() {
-    // 1. Check for a bundled JRE inside the app folder
-    const bundledPath = path.join(__dirname, 'jre', 'bin', 'java.exe'); // Use 'java' on Mac/Linux
+    // 2. Otherwise, look for the 'jre' folder inside the app
+    const bundledPath = path.join(__dirname, 'jre', 'bin', 'java.exe');
     
-    // Check if bundled java exists (using synchronous check for simplicity here, or async if preferred)
-    // Note: In production (packaged app), path handling might differ slightly depending on where you unpack resources.
+    // Check if it exists
     try {
+        // We use 'require' here to check file existence synchronously
         require('fs').accessSync(bundledPath);
-        console.log('[Manager] Using bundled Java:', bundledPath);
+        console.log('[Manager] Using bundled Java at:', bundledPath);
         return bundledPath;
     } catch (e) {
-        console.log('[Manager] Bundled Java not found, falling back to system "java"');
-        return 'java'; // Fallback to system PATH
+        // 3. Fallback: If bundled Java is missing, try global 'java'
+        console.log('[Manager] Bundled Java not found. Falling back to global "java" command.');
+        return 'java'; 
     }
 }
 
@@ -121,6 +122,7 @@ ipcMain.handle('select-directory', async () => {
 
 // --- Server Interaction IPC ---
 
+// --- Update the start-server handler ---
 ipcMain.on('start-server', async (event, serverId) => {
     if (runningServers.has(serverId)) {
         mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Server is already running.\n' });
@@ -137,10 +139,10 @@ ipcMain.on('start-server', async (event, serverId) => {
     
     const args = (serverConfig.javaArgs || '').split(' ').filter(Boolean);
     
-    // UPDATED: Use our smart java path finder
-    const javaExecutable = serverConfig.javaPath || getJavaPath(); 
-    
-    const serverProcess = spawn(javaExecutable, [...args, '-jar', serverConfig.jarFile], { cwd: serverConfig.path });
+    // USE THE NEW FUNCTION HERE
+    const javaExec = getJavaExecutable(serverConfig);
+
+    const serverProcess = spawn(javaExec, [...args, '-jar', serverConfig.jarFile], { cwd: serverConfig.path });
     
     runningServers.set(serverId, serverProcess);
     mainWindow.webContents.send('server-state-change', { serverId, isRunning: true });
