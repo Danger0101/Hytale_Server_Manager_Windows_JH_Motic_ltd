@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateServer: (serverData) => ipcRenderer.invoke('update-server', serverData),
   deleteServer: (serverId) => ipcRenderer.invoke('delete-server', serverId),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  openFolder: (path) => ipcRenderer.send('open-folder', path),
 
 
   // --- Server Interaction ---
