@@ -1,3 +1,8 @@
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const path = require('path');
+const fs = require('fs/promises');
+const { spawn } = require('child_process');
+
 // --- Add this helper function at the very top of main.js ---
 function getJavaExecutable(serverConfig) {
     // 1. If user manually typed a path in settings, use that
@@ -117,6 +122,10 @@ ipcMain.handle('select-directory', async () => {
         properties: ['openDirectory']
     });
     return result.filePaths[0];
+});
+
+ipcMain.on('open-folder', (event, folderPath) => {
+    shell.openPath(folderPath);
 });
 
 
