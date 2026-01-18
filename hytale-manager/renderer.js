@@ -283,6 +283,47 @@ if (importFromLauncherBtn) {
     });
 }
 
+// Add this near the importFromLauncherBtn listener
+const installCliBtn = document.getElementById('installCliBtn');
+
+if (installCliBtn) {
+    installCliBtn.addEventListener('click', async () => {
+        // Validation: Need an ID to know where to install
+        const targetId = activeServerId || serverIdInput.value;
+        if (!targetId) {
+            alert("Please save the server first.");
+            return;
+        }
+
+        // Lock UI
+        installCliBtn.disabled = true;
+        installCliBtn.textContent = "Running...";
+        
+        // Switch to console view to see progress (Auth codes might appear!)
+        if (activeServerId === targetId) {
+            hideModal(); // Close modal so they can see the console
+            // Force view update to ensure console is visible
+            document.getElementById('serverView').style.display = 'flex'; 
+        }
+
+        alert("Starting Hytale Downloader.\n\nWatch the console! You may need to authenticate.");
+
+        // Call Backend
+        const result = await window.electronAPI.installViaCli(targetId);
+
+        // Unlock UI
+        installCliBtn.disabled = false;
+        installCliBtn.textContent = "☁️ Hytale Downloader";
+
+        if (result.success) {
+            alert("Installation Complete!");
+            window.electronAPI.checkJarExists(targetId).then(() => updateServerView());
+        } else {
+            alert("Error: " + result.message);
+        }
+    });
+}
+
 // --- CONFIG EDITOR LOGIC (Hybrid) ---
 
 // Elements
