@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   lookupHytalePlayer: (data) => ipcRenderer.invoke('lookup-hytale-player', data),
   reportPlayer: (serverId, playerId, reason) => ipcRenderer.invoke('report-hytale-player', { serverId, playerId, reason }),
   checkHytaleVersion: (serverId) => ipcRenderer.invoke('check-hytale-version', serverId),
+  installViaCli: (serverId) => ipcRenderer.invoke('install-via-cli', serverId),
 
   // File Editing
   readFile: (data) => ipcRenderer.invoke('read-file', data),
