@@ -35,6 +35,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const discordWebhookInput = document.getElementById('discordWebhookInput');
     const uptimeBadge = document.getElementById('uptimeBadge');
 
+    // --- JAR File Browser (New Search) ---
+    const jarBrowseBtn = document.getElementById('jarBrowseBtn'); // We will add this ID to HTML next
+    if (jarBrowseBtn) {
+        jarBrowseBtn.addEventListener('click', async () => {
+            const path = await window.electronAPI.selectFile({ name: 'Java Archive', extensions: ['jar'] });
+            if (path) {
+                // We only want the filename, not the full path, as per Hytale logic
+                // But for clarity, let's set the input to the filename
+                const filename = path.split(/[\\/]/).pop();
+                document.getElementById('jarFileInput').value = filename;
+            }
+        });
+    }
+
+
     // Hytale Cloud Settings Elements
     const hytaleApiKeyInput = document.getElementById('hytaleApiKeyInput');
     const enablePaymentsCheckbox = document.getElementById('enablePaymentsCheckbox');
@@ -56,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add to Elements
     const importFromLauncherBtn = document.getElementById('importFromLauncherBtn');
+    const installCliBtn = document.getElementById('installCliBtn');
+
 
     // --- Global Timer Variable ---
     let uptimeInterval = null;
@@ -128,6 +145,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 startButton.disabled = state.isRunning;
             }
         }
+
+        // 1. Update Public IP
+        const ipLabel = document.getElementById('publicIpLabel');
+        if (ipLabel) {
+            ipLabel.textContent = "Fetching...";
+            const ip = await window.electronAPI.getPublicIp();
+            ipLabel.textContent = ip;
+        }
+        
+        // 2. Check for AOT Cache Optimization
+        const hasAot = await window.electronAPI.checkAotFile(activeServerId);
+        const aotBadge = document.getElementById('aotStatusBadge');
+        if (aotBadge) {
+            if (hasAot) {
+                // Check if the argument is already applied
+                const server = servers.find(s => s.id === activeServerId);
+                if (server.javaArgs && server.javaArgs.includes('HytaleServer.aot')) {
+                     aotBadge.textContent = "⚡ AOT Active";
+                     aotBadge.style.color = "#4CAF50";
+                } else {
+                     aotBadge.innerHTML = `<button id="enableAotBtn" style="font-size:0.8em; cursor:pointer; background:#e67e22; border:none; color:white; padding:2px 5px; border-radius:3px;">Enable Boost ⚡</button>`;
+                     
+                     // Quick listener for the dynamic button
+                     document.getElementById('enableAotBtn').addEventListener('click', async () => {
+                         const currentArgs = server.javaArgs || "";
+                         const newArgs = `-XX:AOTCache=HytaleServer.aot ${currentArgs}`.trim();
+                         
+                         // Update Server
+                         server.javaArgs = newArgs;
+                         document.getElementById('javaArgsInput').value = newArgs; // Update form if open
+                         await window.electronAPI.updateServer(server);
+                         updateServerView(); // Refresh UI
+                         alert("Boot Optimization Enabled!\n\nAdded '-XX:AOTCache=HytaleServer.aot' to Java Arguments.");
+                     });
+                }
+            } else {
+                aotBadge.textContent = "No AOT File";
+                aotBadge.style.color = "#888";
+            }
+        }
     }
 
     async function switchActiveServer(serverId) {
@@ -153,7 +210,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Modal Logic ---
 
     function showModal(server = null) {
+        console.log('Entering showModal() function.');
         serverForm.reset();
+        resetTabs(); // <--- ADD THIS LINE
         if (server) {
             modalTitle.textContent = 'Edit Server';
             serverIdInput.value = server.id;
@@ -173,9 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Trigger visual state
             paymentSettings.style.display = server.enablePayments ? 'block' : 'none';
             
-            // Load Tokens
-            document.getElementById('authSessionTokenInput').value = server.authSessionToken || '';
-            document.getElementById('authIdentityTokenInput').value = server.authIdentityToken || '';
+            // Enable install/import buttons for existing servers
+            if (importFromLauncherBtn) importFromLauncherBtn.disabled = false;
+            if (installCliBtn) installCliBtn.disabled = false;
+
         } else {
             modalTitle.textContent = 'Add a New Server';
             serverIdInput.value = '';
@@ -183,6 +243,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clear them for new server
             document.getElementById('authSessionTokenInput').value = '';
             document.getElementById('authIdentityTokenInput').value = '';
+
+            // Disable install/import buttons for new servers
+            if (importFromLauncherBtn) importFromLauncherBtn.disabled = true;
+            if (installCliBtn) installCliBtn.disabled = true;
         }
         modal.style.display = 'flex';
     }
@@ -199,8 +263,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    addServerBtn.addEventListener('click', () => showModal());
-    initialAddServerBtn.addEventListener('click', () => showModal());
+    addServerBtn.addEventListener('click', () => {
+        console.log('addServerBtn clicked, calling showModal()');
+        showModal();
+    });
+    initialAddServerBtn.addEventListener('click', () => {
+        console.log('initialAddServerBtn clicked, calling showModal()');
+        showModal();
+    });
     closeModalBtn.addEventListener('click', hideModal);
     window.addEventListener('click', (e) => {
         if (e.target === modal) hideModal();
@@ -258,71 +328,124 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-// Add Listener
-if (importFromLauncherBtn) {
-    importFromLauncherBtn.addEventListener('click', async () => {
-        // We need a temporary or active ID. If creating new, we might not have ID yet.
-        // For simplicity, this button works best on "Edit Server" (Active ID).
-        if (!activeServerId && serverIdInput.value === "") {
-            alert("Please save the server first, then Edit it to import files.");
-            return;
-        }
+    // --- Updated Hytale Downloader Button Logic ---
+    if (installCliBtn) {
+        installCliBtn.addEventListener('click', async () => {
+            const targetId = await autoSaveAndGetId();
+            if (!targetId) return;
 
-        // Use the ID from the form or active
-        const targetId = activeServerId || serverIdInput.value;
+            // 1. Check if tool exists
+            const hasTool = await window.electronAPI.checkCliTool();
 
-        importFromLauncherBtn.disabled = true;
-        importFromLauncherBtn.textContent = "Searching & Copying...";
+            if (!hasTool) {
+                if (confirm("The Hytale Downloader tool is missing.\n\nDownload it automatically from downloader.hytale.com?")) {
+                    installCliBtn.disabled = true;
+                    installCliBtn.textContent = "Setting up tool...";
+                    
+                    // Listen for status updates
+                    window.electronAPI.onToolDownloadStatus((status) => {
+                        installCliBtn.textContent = status;
+                    });
 
-        const result = await window.electronAPI.importFromLauncher(targetId);
+                    const dlResult = await window.electronAPI.downloadCliTool();
+                    
+                    if (!dlResult.success) {
+                        alert("Failed to download tool: " + dlResult.message);
+                        installCliBtn.disabled = false;
+                        installCliBtn.textContent = "☁️ Hytale Downloader";
+                        return;
+                    }
+                    // Success! Proceed to run it.
+                } else {
+                    return; // User cancelled
+                }
+            }
 
-        alert(result.message);
+            // 2. Run the Tool (Existing Logic)
+            installCliBtn.disabled = true;
+            installCliBtn.textContent = "Running...";
+            
+            hideModal();
+            updateServerView(); 
+            
+            alert("Starting Hytale Downloader.\n\nCheck the console for Authentication Codes!");
 
-        importFromLauncherBtn.disabled = false;
-        importFromLauncherBtn.textContent = "📥 Import from Hytale Launcher";
-    });
-}
+            const result = await window.electronAPI.installViaCli(targetId);
 
-// Add this near the importFromLauncherBtn listener
-const installCliBtn = document.getElementById('installCliBtn');
+            installCliBtn.disabled = false;
+            installCliBtn.textContent = "☁️ Hytale Downloader";
 
-if (installCliBtn) {
-    installCliBtn.addEventListener('click', async () => {
-        // Validation: Need an ID to know where to install
-        const targetId = activeServerId || serverIdInput.value;
-        if (!targetId) {
-            alert("Please save the server first.");
-            return;
-        }
+            if (result.success) {
+                alert("Installation Complete!");
+                updateServerView();
+            } else {
+                alert("Error: " + result.message);
+                showModal(servers.find(s => s.id === targetId));
+            }
+        });
+    }
 
-        // Lock UI
-        installCliBtn.disabled = true;
-        installCliBtn.textContent = "Running...";
-        
-        // Switch to console view to see progress (Auth codes might appear!)
-        if (activeServerId === targetId) {
-            hideModal(); // Close modal so they can see the console
-            // Force view update to ensure console is visible
-            document.getElementById('serverView').style.display = 'flex'; 
-        }
+    // --- Import From Launcher Button ---
+    if (importFromLauncherBtn) {
+        importFromLauncherBtn.addEventListener('click', async () => {
+            const targetId = await autoSaveAndGetId(); // <--- Auto-save magic
+            if (!targetId) return;
 
-        alert("Starting Hytale Downloader.\n\nWatch the console! You may need to authenticate.");
+            importFromLauncherBtn.disabled = true;
+            importFromLauncherBtn.textContent = "Searching...";
 
-        // Call Backend
-        const result = await window.electronAPI.installViaCli(targetId);
+            const result = await window.electronAPI.importFromLauncher(targetId);
 
-        // Unlock UI
-        installCliBtn.disabled = false;
-        installCliBtn.textContent = "☁️ Hytale Downloader";
+            importFromLauncherBtn.disabled = false;
+            importFromLauncherBtn.textContent = "📥 Import from Launcher";
+            
+            alert(result.message);
+        });
+    }
 
-        if (result.success) {
-            alert("Installation Complete!");
-            window.electronAPI.checkJarExists(targetId).then(() => updateServerView());
-        } else {
-            alert("Error: " + result.message);
-        }
-    });
-}
+    // --- JAVA CHECK LOGIC ---
+    
+    // 1. Add a button listener for a new "Check/Install Java" button (We will add to HTML next)
+    const checkJavaBtn = document.getElementById('checkJavaBtn');
+    
+    if (checkJavaBtn) {
+        checkJavaBtn.addEventListener('click', async () => {
+            checkJavaBtn.disabled = true;
+            checkJavaBtn.textContent = "Checking...";
+            
+            const result = await window.electronAPI.checkJavaInstalled();
+            
+            if (result.installed) {
+                alert(`Java is installed! (${result.type})`);
+                checkJavaBtn.textContent = "✅ Java Installed";
+                checkJavaBtn.style.background = "var(--green-btn)";
+                checkJavaBtn.disabled = false;
+            } else {
+                if (confirm("Java 25 is missing or not bundled.\n\nDownload and install Adoptium Temurin 25 automatically?")) {
+                    checkJavaBtn.textContent = "Downloading...";
+                    
+                    // Listen for status
+                    window.electronAPI.onToolDownloadStatus((status) => {
+                        checkJavaBtn.textContent = status;
+                    });
+
+                    const dlResult = await window.electronAPI.downloadJava();
+                    
+                    if (dlResult.success) {
+                        alert("Java 25 installed successfully into /jre folder!");
+                        checkJavaBtn.textContent = "✅ Java Installed";
+                        checkJavaBtn.style.background = "var(--green-btn)";
+                    } else {
+                        alert("Error: " + dlResult.message);
+                        checkJavaBtn.textContent = "⚠️ Install Failed";
+                    }
+                } else {
+                    checkJavaBtn.textContent = "❌ Java Missing";
+                    checkJavaBtn.disabled = false;
+                }
+            }
+        });
+    }
 
 // --- CONFIG EDITOR LOGIC (Hybrid) ---
 
@@ -693,6 +816,43 @@ function stopUptimeTimer() {
     uptimeBadge.style.display = 'none';
 }
 
+    // Helper to auto-save before performing actions like Import/Install
+    async function autoSaveAndGetId() {
+        // If we already have an ID (Editing), just return it
+        if (serverIdInput.value) return serverIdInput.value;
+
+        // Validation
+        if (!serverNameInput.value || !serverPathInput.value) {
+            alert("Please enter a Server Name and Path first.");
+            // Switch to General tab so they can see the error
+            modalTabBtns[0].click(); 
+            return null;
+        }
+
+        // Create the server object from form data
+        const serverData = {
+            id: '', // Empty triggers 'add-server' in backend
+            name: serverNameInput.value,
+            path: serverPathInput.value,
+            jarFile: jarFileInput.value,
+            // Defaults for others
+            javaArgs: '', javaPath: '', discordWebhook: '',
+            updateUrl: '', autoUpdate: false, hytaleApiKey: '', 
+            enablePayments: false, merchantId: '',
+            authSessionToken: '', authIdentityToken: ''
+        };
+
+        // Save it!
+        const newServer = await window.electronAPI.addServer(serverData);
+        
+        // Update the form with the new ID so we are now "Editing"
+        serverIdInput.value = newServer.id;
+        activeServerId = newServer.id; // Make it active
+        await loadServers(); // Refresh sidebar
+        
+        return newServer.id;
+    }
+
 // --- PLAYER MANAGER LOGIC ---
 
 // Elements
@@ -910,6 +1070,48 @@ async function savePlayerList() {
         content 
     });
 }
+
+
+    // --- Tab Switching Logic ---
+    const modalTabBtns = document.querySelectorAll('.modal-tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    modalTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active class from all
+            modalTabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            // Add to clicked
+            btn.classList.add('active');
+            const targetId = btn.dataset.tab;
+            document.getElementById(targetId).classList.add('active');
+        });
+    });
+
+    // Reset tabs when opening modal
+    function resetTabs() {
+        modalTabBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        // Set first one active
+        modalTabBtns[0].classList.add('active');
+        tabContents[0].classList.add('active');
+    }
+
+    const firewallBtn = document.getElementById('firewallBtn');
+    if (firewallBtn) {
+        firewallBtn.addEventListener('click', async () => {
+            firewallBtn.disabled = true;
+            firewallBtn.textContent = "Prompting...";
+            
+            const result = await window.electronAPI.setupFirewall(5520); // Default port
+            
+            alert(result.message);
+            
+            firewallBtn.disabled = false;
+            firewallBtn.textContent = "🛡️ Open Firewall Port (5520)";
+        });
+    }
 
     // --- Initialization ---
 
