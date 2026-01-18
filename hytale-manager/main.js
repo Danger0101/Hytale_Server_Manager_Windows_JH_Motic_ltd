@@ -184,7 +184,31 @@ ipcMain.on('start-server', async (event, serverId) => {
     runningServers.set(serverId, serverProcess);
     mainWindow.webContents.send('server-state-change', { serverId, isRunning: true });
 
-    serverProcess.stdout.on('data', (data) => mainWindow.webContents.send('server-log', { serverId, log: data.toString() }));
+    // 1. Send START Notification (Green Color: 5763719)
+    sendDiscordNotification(serverConfig.discordWebhook, `🟢 Server "${serverConfig.name}" is Starting...`, 5763719);
+
+    serverProcess.stdout.on('data', (data) => {
+        const logLine = data.toString();
+        
+        // Send to GUI Console
+        mainWindow.webContents.send('server-log', { serverId, log: logLine });
+
+        // --- NEW: DETECT PLAYER ACTIVITY ---
+        // Regex to find names. Note: Adjust these patterns if Hytale logs differ!
+        // Standard Minecraft pattern: "PlayerName joined the game"
+        const joinMatch = logLine.match(/(\w+) joined the game/); 
+        const leaveMatch = logLine.match(/(\w+) left the game/);
+
+        if (joinMatch) {
+            const playerName = joinMatch[1];
+            updatePlayerHistory(serverConfig, playerName, 'join');
+            // Discord Alert
+            sendDiscordNotification(serverConfig.discordWebhook, `👤 ${playerName} joined the server!`, 3447003);
+        }
+        if (leaveMatch) {
+            updatePlayerHistory(serverConfig, leaveMatch[1], 'leave');
+        }
+    });
     serverProcess.stderr.on('data', (data) => mainWindow.webContents.send('server-log', { serverId, log: `[STDERR] ${data.toString()}` }));
 
     serverProcess.on('close', (code) => {
@@ -199,6 +223,9 @@ ipcMain.on('start-server', async (event, serverId) => {
         mainWindow.webContents.send('server-log', { serverId, log: msg });
         mainWindow.webContents.send('server-state-change', { serverId, isRunning: false });
         runningServers.delete(serverId);
+        
+        // 3. Send STOP Notification (Red Color: 15548997)
+        sendDiscordNotification(serverConfig.discordWebhook, `🔴 Server "${serverConfig.name}" has stopped.`, 15548997);
     });
 
     serverProcess.on('error', (err) => {
@@ -226,3 +253,92 @@ ipcMain.on('send-command', (event, { serverId, command }) => {
         mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Cannot send command: Server not running.\n' });
     }
 });
+
+// --- Config Editor Logic ---
+
+ipcMain.handle('read-file', async (event, { serverId, filename }) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) throw new Error("Server not found");
+
+    const filePath = path.join(server.path, filename);
+    try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        return { success: true, content };
+    } catch (err) {
+        // If file doesn't exist, return empty string or specific error
+        return { success: false, error: err.message };
+    }
+});
+
+ipcMain.handle('save-file', async (event, { serverId, filename, content }) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) throw new Error("Server not found");
+
+    const filePath = path.join(server.path, filename);
+    try {
+        await fs.writeFile(filePath, content, 'utf-8');
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+// --- Discord Helper ---
+async function sendDiscordNotification(webhookUrl, message, color = 5814783) {
+    if (!webhookUrl || !webhookUrl.startsWith('http')) return;
+    
+    try {
+        await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                embeds: [{
+                    description: `**${message}**`,
+                    color: color, // Decimal color code
+                    footer: { text: "Hytale Server Manager" },
+                    timestamp: new Date().toISOString()
+                }]
+            })
+        });
+    } catch (err) {
+        console.error("Failed to send Discord webhook:", err.message);
+    }
+}
+
+// --- Player History Logic ---
+async function updatePlayerHistory(server, playerName, action) {
+    const historyFile = path.join(server.path, 'player-history.json');
+    let history = [];
+
+    // 1. Try to read existing history
+    try {
+        const content = await fs.readFile(historyFile, 'utf-8');
+        history = JSON.parse(content);
+    } catch (e) {
+        // File doesn't exist yet, which is fine
+        history = [];
+    }
+
+    // 2. Find if player exists
+    const index = history.findIndex(p => p.name === playerName);
+    const now = new Date().toISOString();
+
+    if (index !== -1) {
+        // Update existing player
+        history[index].lastSeen = now;
+        history[index].lastAction = action; // 'join' or 'leave'
+    } else {
+        // Add new player
+        history.push({
+            name: playerName,
+            firstSeen: now,
+            lastSeen: now,
+            lastAction: action
+        });
+    }
+
+    // 3. Save back to file
+    await fs.writeFile(historyFile, JSON.stringify(history, null, 2));
+}
