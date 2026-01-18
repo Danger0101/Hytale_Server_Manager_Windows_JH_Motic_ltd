@@ -540,6 +540,74 @@ ipcMain.handle('import-from-launcher', async (event, serverId) => {
         return { success: false, message: 'Import Error: ' + error.message };
     }
 });
+
+// --- NEW: HYTALE DOWNLOADER CLI INTEGRATION ---
+
+function getDownloaderPath() {
+    // Look for the tool in the 'bin' folder we created
+    const bundledPath = path.join(__dirname, 'bin', 'hytale-downloader.exe'); // Add .exe extension if Windows-only
+    return bundledPath;
+}
+
+ipcMain.handle('install-via-cli', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return { success: false, message: 'Server not found.' };
+
+    const toolPath = getDownloaderPath();
+    
+    // 1. Check if tool exists
+    try {
+        require('fs').accessSync(toolPath);
+    } catch (e) {
+        return { success: false, message: `Downloader Tool not found at: ${toolPath}. Please download it and place it in the 'bin' folder.` };
+    }
+
+    // 2. Prepare Command
+    // We run it inside the server's directory so it downloads files there.
+    // Manual says: "./hytale-downloader" downloads latest release.
+    const cwd = server.path;
+    
+    // Ensure server directory exists
+    try { await fs.mkdir(cwd, { recursive: true }); } catch (e) {}
+
+    return new Promise((resolve) => {
+        mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Launching Hytale Downloader CLI...\n` });
+
+        // Spawn the tool
+        const downloader = spawn(toolPath, [], { cwd });
+
+        // 3. Handle Output (Crucial for Auth)
+        downloader.stdout.on('data', (data) => {
+            const line = data.toString();
+            
+            // Forward output to console
+            mainWindow.webContents.send('server-log', { serverId, log: line });
+
+            // DETECT AUTH REQUEST (Just like the server)
+            // If the downloader asks for auth, show the popup
+            if (line.includes('accounts.hytale.com/device')) {
+                mainWindow.webContents.send('auth-needed', line);
+            }
+        });
+
+        downloader.stderr.on('data', (data) => {
+            mainWindow.webContents.send('server-log', { serverId, log: `[CLI Error] ${data.toString()}` });
+        });
+
+        downloader.on('close', (code) => {
+            if (code === 0) {
+                resolve({ success: true, message: 'Hytale Downloader finished successfully.' });
+            } else {
+                resolve({ success: false, message: `Downloader failed with exit code ${code}. Check logs.` });
+            }
+        });
+        
+        downloader.on('error', (err) => {
+             resolve({ success: false, message: `Failed to start downloader: ${err.message}` });
+        });
+    });
+});
 // --- HYTALE OFFICIAL API INTEGRATION ---
 
 // Helper for Hytale API Calls
