@@ -2,7 +2,9 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const https = require('https');
-const { spawn, exec } = require('child_process'); // Added exec for unzipping
+const { spawn, exec } = require('child_process');
+
+const isWin = process.platform === 'win32'; // Define isWin globally
 
 // --- Add this helper function at the very top of main.js ---
 function getJavaExecutable(serverConfig) {
@@ -545,30 +547,43 @@ ipcMain.handle('import-from-launcher', async (event, serverId) => {
 
 // 1. Updated Helper: Chooses correct binary based on OS
 function getDownloaderPath() {
-    const isWin = process.platform === 'win32';
     // Matches the files you listed: 
     const filename = isWin ? 'hytale-downloader-windows-amd64.exe' : 'hytale-downloader-linux-amd64';
     return path.join(__dirname, 'bin', filename);
 }
 
-// 2. Helper: Unzip function using system tools
-async function extractZip(zipPath, destDir) {
+// --- JAVA AUTO-SETUP (NEW) ---
+
+// Map Node.js platform/arch to Adoptium API values
+function getAdoptiumPlatform() {
+    const platformMap = { 'win32': 'windows', 'linux': 'linux', 'darwin': 'mac' };
+    const archMap = { 'x64': 'x64', 'arm64': 'aarch64' };
+    
+    return {
+        os: platformMap[process.platform],
+        arch: archMap[process.arch]
+    };
+}
+
+// 2. Helper: Archive Extraction (Supports ZIP and TAR.GZ)
+async function extractArchive(filePath, destDir) {
+    const isZip = filePath.endsWith('.zip');
+    
     if (process.platform === 'win32') {
-        // PowerShell Expansion
-        return new Promise((resolve, reject) => {
-            const cmd = `powershell -command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destDir}' -Force"`;
-            exec(cmd, (err) => {
-                if (err) reject(err);
-                else resolve();
+        // Windows: PowerShell for Zip
+        if (isZip) {
+            return new Promise((resolve, reject) => {
+                const cmd = `powershell -command "Expand-Archive -Path '${filePath}' -DestinationPath '${destDir}' -Force"`;
+                exec(cmd, (err) => err ? reject(err) : resolve());
             });
-        });
+        } 
+        // Note: Windows doesn't natively handle tar.gz easily without 3rd party tools in older versions, 
+        // but Adoptium sends .zip for Windows, so we are safe.
     } else {
-        // Linux/Mac: unzip command
+        // Linux/Mac
+        const cmd = isZip ? `unzip -o "${filePath}" -d "${destDir}"` : `tar -xzf "${filePath}" -C "${destDir}"`;
         return new Promise((resolve, reject) => {
-            exec(`unzip -o "${zipPath}" -d "${destDir}"`, (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
+            exec(cmd, (err) => err ? reject(err) : resolve());
         });
     }
 }
@@ -731,6 +746,171 @@ ipcMain.handle('report-hytale-player', async (event, { serverId, playerId, reaso
     });
 });
 
+
+// --- TOOL AUTO-SETUP (NEW) ---
+
+const CLI_TOOL_URL = 'https://downloader.hytale.com/hytale-downloader.zip';
+
+// 1. Check if the tool exists
+ipcMain.handle('check-cli-tool', async () => {
+    const toolPath = getDownloaderPath();
+    try {
+        require('fs').accessSync(toolPath);
+        return true;
+    } catch {
+        return false;
+    }
+});
+
+// 2. Download and Install the Tool
+ipcMain.handle('download-cli-tool', async (event) => {
+    const binDir = path.join(__dirname, 'bin');
+    const zipPath = path.join(binDir, 'hytale-downloader.zip');
+
+    // Ensure bin exists
+    try { await fs.mkdir(binDir, { recursive: true }); } catch (e) {}
+
+    // A. Download the ZIP
+    mainWindow.webContents.send('tool-download-status', 'Downloading tool from hytale.com...');
+    
+    try {
+        await new Promise((resolve, reject) => {
+            const file = require('fs').createWriteStream(zipPath);
+            https.get(CLI_TOOL_URL, (response) => {
+                if (response.statusCode !== 200) {
+                    reject(new Error(`Download failed: HTTP ${response.statusCode}`));
+                    return;
+                }
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close();
+                    resolve();
+                });
+            }).on('error', (err) => {
+                fs.unlink(zipPath, () => {});
+                reject(err);
+            });
+        });
+
+        // B. Extract it
+        mainWindow.webContents.send('tool-download-status', 'Extracting tool...');
+        await extractArchive(zipPath, binDir);
+
+        // C. Cleanup
+        await fs.unlink(zipPath);
+
+        // D. Verify
+        const toolPath = getDownloaderPath();
+        if (require('fs').existsSync(toolPath)) {
+            // Linux permission fix
+            if (process.platform !== 'win32') {
+                try { require('fs').chmodSync(toolPath, '755'); } catch(e) {}
+            }
+            return { success: true };
+        } else {
+            return { success: false, message: 'Extraction finished but binary not found.' };
+        }
+
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
+// Helper to open file dialog for specific files (JARs)
+ipcMain.handle('select-file', async (event, filter) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: filter ? [filter] : []
+    });
+    return result.filePaths[0];
+});
+
+// --- JAVA AUTO-SETUP (NEW) ---
+
+ipcMain.handle('check-java-installed', async () => {
+    // 1. Check Bundled
+    const bundledPath = path.join(__dirname, 'jre', 'bin', isWin ? 'java.exe' : 'java');
+    if (require('fs').existsSync(bundledPath)) return { installed: true, type: 'bundled' };
+
+    // 2. Check Global (Optional: strict users might prefer we only use bundled)
+    return new Promise((resolve) => {
+        exec('java -version', (err) => {
+            if (!err) resolve({ installed: true, type: 'global' });
+            else resolve({ installed: false });
+        });
+    });
+});
+
+ipcMain.handle('download-java', async () => {
+    const { os, arch } = getAdoptiumPlatform();
+    if (!os || !arch) return { success: false, message: 'Unsupported Platform' };
+
+    // Adoptium API Endpoint for Latest Java 25 (GA)
+    // Ref: https://api.adoptium.net/q/swagger-ui/#/Binary/getBinary
+    const apiUrl = `https://api.adoptium.net/v3/binary/latest/25/ga/${os}/${arch}/jdk/hotspot/normal/eclipse`;
+
+    const jreDir = path.join(__dirname, 'jre');
+    const tempFile = path.join(__dirname, os === 'windows' ? 'java_temp.zip' : 'java_temp.tar.gz');
+
+    try {
+        // 1. Prepare Folders
+        try { await fs.rm(jreDir, { recursive: true, force: true }); } catch(e) {}
+        await fs.mkdir(jreDir, { recursive: true });
+
+        // 2. Download
+        mainWindow.webContents.send('tool-download-status', 'Fetching Java 25 from Adoptium...');
+        await new Promise((resolve, reject) => {
+            const file = require('fs').createWriteStream(tempFile);
+            https.get(apiUrl, (res) => {
+                if (res.statusCode === 302 || res.statusCode === 307) {
+                    // Handle Redirects (Adoptium API redirects to Github/Cloudflare)
+                    https.get(res.headers.location, (redirectRes) => {
+                        if (redirectRes.statusCode !== 200) { reject(new Error('Download failed')); return; }
+                        redirectRes.pipe(file);
+                        file.on('finish', () => { file.close(); resolve(); });
+                    }).on('error', reject);
+                } else if (res.statusCode !== 200) {
+                    reject(new Error(`API Error: ${res.statusCode}`));
+                } else {
+                    res.pipe(file);
+                    file.on('finish', () => { file.close(); resolve(); });
+                }
+            }).on('error', reject);
+        });
+
+        // 3. Extract
+        mainWindow.webContents.send('tool-download-status', 'Extracting Java...');
+        await extractArchive(tempFile, jreDir);
+
+        // 4. Flatten Directory
+        // The zip usually contains a root folder like "jdk-25.0.1+8". We want the contents of that DIRECTLY in 'jre'.
+        const files = await fs.readdir(jreDir);
+        if (files.length === 1 && (await fs.stat(path.join(jreDir, files[0]))).isDirectory()) {
+            const nestedDir = path.join(jreDir, files[0]);
+            const children = await fs.readdir(nestedDir);
+            
+            for (const child of children) {
+                await fs.rename(path.join(nestedDir, child), path.join(jreDir, child));
+            }
+            await fs.rm(nestedDir, { recursive: true });
+        }
+
+        // 5. Cleanup
+        await fs.unlink(tempFile);
+        
+        // 6. Permission Fix (Linux/Mac)
+        if (!isWin) { // Use the global isWin
+            const javaBin = path.join(jreDir, 'bin', 'java');
+            try { await fs.chmod(javaBin, 0o755); } catch(e) {}
+        }
+
+        return { success: true };
+
+    } catch (e) {
+        return { success: false, message: e.message };
+    }
+});
+
 // --- Discord Helper ---
 async function sendDiscordNotification(webhookUrl, message, color) {
     if (!webhookUrl || webhookUrl.trim() === "") return;
@@ -765,3 +945,58 @@ async function sendDiscordNotification(webhookUrl, message, color) {
     req.write(JSON.stringify(payload));
     req.end();
 }
+
+// --- NETWORK & PERFORMANCE AUTOMATION ---
+
+// 1. One-Click Firewall Setup (Windows Only)
+ipcMain.handle('setup-firewall', async (event, port = 5520) => {
+    if (process.platform !== 'win32') {
+        return { success: false, message: 'Automated firewall setup is currently Windows-only. On Linux, use: sudo ufw allow 5520/udp' };
+    }
+
+    // PowerShell command to add the rule. 
+    // We use "Start-Process -Verb RunAs" to trigger the UAC Admin Prompt automatically.
+    const ruleName = `Hytale Server (UDP ${port})`;
+    const psCommand = `New-NetFirewallRule -DisplayName '${ruleName}' -Direction Inbound -Protocol UDP -LocalPort ${port} -Action Allow`;
+    const fullCommand = `powershell -Command "Start-Process powershell -Verb RunAs -ArgumentList \\"-NoProfile -ExecutionPolicy Bypass -Command ${psCommand}\\""`;
+
+    return new Promise((resolve) => {
+        exec(fullCommand, (error) => {
+            if (error) {
+                resolve({ success: false, message: `Failed to trigger firewall setup: ${error.message}` });
+            } else {
+                // We can't easily know if they clicked "Yes" on UAC, but if the command launched, it's a good sign.
+                resolve({ success: true, message: 'Windows Firewall prompt launched! Click "Yes" to allow the port.' });
+            }
+        });
+    });
+});
+
+// 2. Public IP Fetcher
+ipcMain.handle('get-public-ip', async () => {
+    return new Promise((resolve) => {
+        https.get('https://api.ipify.org?format=json', (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    resolve(json.ip);
+                } catch {
+                    resolve('Unknown');
+                }
+            });
+        }).on('error', () => resolve('Error'));
+    });
+});
+
+// 3. AOT Cache Detection
+ipcMain.handle('check-aot-file', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return false;
+    
+    // The manual says the file is named "HytaleServer.aot"
+    const aotPath = path.join(server.path, 'HytaleServer.aot');
+    return require('fs').existsSync(aotPath);
+});
