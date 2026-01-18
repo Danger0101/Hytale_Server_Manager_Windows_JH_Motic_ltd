@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteServer: (serverId) => ipcRenderer.invoke('delete-server', serverId),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   openFolder: (path) => ipcRenderer.send('open-folder', path),
+  openBackupFolder: (serverId) => ipcRenderer.invoke('open-backup-folder', serverId),
   backupServer: (serverId) => ipcRenderer.invoke('backup-server', serverId),
   installServerJar: (serverId) => ipcRenderer.invoke('install-server-jar', serverId),
   checkJarExists: (serverId) => ipcRenderer.invoke('check-jar-exists', serverId),
