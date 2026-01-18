@@ -115,6 +115,19 @@
                         <label for="merchantId">Merchant ID</label>
                         <input type="text" id="merchantIdInput" placeholder="mer_123456789">
                     </div>
+
+                    <div style="margin-top: 15px; border-top: 1px dashed #444; padding-top: 10px;">
+                        <h4 style="margin: 0 0 10px 0; color: #d0bfff;">Advanced Authentication (Method C)</h4>
+                        <p style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">
+                            Leave blank to use interactive Console Auth. Use these tokens for automated/provider setups.
+                        </p>
+                        
+                        <label for="authSessionToken">Session Token (JWT)</label>
+                        <input type="password" id="authSessionTokenInput" placeholder="eyJ..." style="background: #1a1a1a; border: 1px solid #444; color: white; margin-bottom: 5px;">
+                        
+                        <label for="authIdentityToken">Identity Token (JWT)</label>
+                        <input type="password" id="authIdentityTokenInput" placeholder="eyJ..." style="background: #1a1a1a; border: 1px solid #444; color: white;">
+                    </div>
                 </div>
 
                 <label for="javaArgs">Java Arguments (optional)</label>
