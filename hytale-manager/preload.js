@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   openFolder: (path) => ipcRenderer.send('open-folder', path),
   backupServer: (serverId) => ipcRenderer.invoke('backup-server', serverId),
+  installServerJar: (serverId) => ipcRenderer.invoke('install-server-jar', serverId),
+  checkJarExists: (serverId) => ipcRenderer.invoke('check-jar-exists', serverId),
 
   // File Editing
   readFile: (data) => ipcRenderer.invoke('read-file', data),
