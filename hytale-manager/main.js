@@ -233,7 +233,15 @@ ipcMain.on('start-server', async (event, serverId) => {
     // We clone the current process environment so we don't lose system paths
     const serverEnv = { ...process.env };
 
-    // Inject Hytale API Key (Enables Telemetry & UUID Lookups on the server side)
+    // --- UPDATED AUTHENTICATION LOGIC ---
+    // Support for Method C: Token Passthrough (from Server Provider Guide)
+    if (serverConfig.authSessionToken && serverConfig.authIdentityToken) {
+        console.log(`[Manager] Injecting OAuth Tokens for Server ${serverId}`);
+        serverEnv['HYTALE_SERVER_SESSION_TOKEN'] = serverConfig.authSessionToken;
+        serverEnv['HYTALE_SERVER_IDENTITY_TOKEN'] = serverConfig.authIdentityToken;
+    }
+
+    // Keep your existing API Key logic (for the separate Web API features)
     if (serverConfig.hytaleApiKey) {
         console.log(`[Manager] Injecting API Key for Server ${serverId}`);
         serverEnv['HYTALE_API_KEY'] = serverConfig.hytaleApiKey;
