@@ -1,12 +1,8 @@
 # --- Dependencies ---
 node_modules/
 **/node_modules/
+**/out
 
-# --- Build Outputs (Electron Forge) ---
-out/
-**/out/
-dist/
-build/
 
 # --- Bundled Java Runtime ---
 # We ignore this so we don't upload 300MB of Java to GitHub
