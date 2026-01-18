@@ -694,6 +694,7 @@ function renderPlayerList() {
     currentPlayerList.forEach((entry, index) => {
         // Handle different formats (Simple String vs Object)
         const name = typeof entry === 'string' ? entry : entry.name;
+        const uuid = entry.uuid; // Get UUID from our stored object
         
         const li = document.createElement('li');
         li.className = 'player-item';
@@ -712,16 +713,22 @@ function renderPlayerList() {
             `;
         }
 
-        // Only show "Remove" button if it's NOT the history tab (History should be permanent-ish)
+        // Only show "Remove" and "Report" buttons if it's NOT the history tab
         const removeBtn = !isHistoryTab ? 
             `<button class="remove-player-btn" data-index="${index}">&times;</button>` : 
+            ``;
+        const reportBtn = !isHistoryTab ? 
+            `<button class="report-player-btn" data-name="${name}" data-uuid="${uuid}" style="background: #d9534f; color: white; border: none; margin-right: 5px;">Report</button>` :
             ``;
 
         li.innerHTML = `
             <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
                 ${infoHtml}
+                <div>
+                    ${reportBtn} 
+                    ${removeBtn}
+                </div>
             </div>
-            ${removeBtn}
         `;
         
         playerList.appendChild(li);
@@ -732,6 +739,24 @@ function renderPlayerList() {
         document.querySelectorAll('.remove-player-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 removePlayer(e.target.dataset.index);
+            });
+        });
+
+        document.querySelectorAll('.report-player-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const name = e.target.dataset.name;
+                const uuid = e.target.dataset.uuid;
+                const reason = prompt(`Report ${name} to Hytale Admin?\n\nEnter a reason for the report:`);
+                
+                if (reason) {
+                    if (!uuid || uuid === "offline-uuid") {
+                        alert(`Cannot report "${name}": Player UUID is not available. This can happen if the player was added in offline mode.`);
+                        return;
+                    }
+                    const result = await window.electronAPI.reportPlayer(activeServerId, uuid, reason);
+                    const message = result.error || (result.success ? "Report submitted successfully!" : "Failed to submit report.");
+                    alert(message);
+                }
             });
         });
     }
