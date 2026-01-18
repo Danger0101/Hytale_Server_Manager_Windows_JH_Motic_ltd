@@ -79,15 +79,40 @@
                 <div style="margin-top: 15px; padding: 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px;">
                     <h3 style="margin-top: 0; font-size: 0.9em; color: #aaa; border-bottom: 1px solid #444; padding-bottom: 5px;">Installation Source</h3>
                     
-                    <label for="updateUrl">Download URL</label>
-                    <input type="text" id="updateUrlInput" placeholder="e.g., https://hytale.com/download/server.jar" style="margin-bottom: 5px;">
-                    <p style="font-size: 0.75rem; color: #888; margin-top: 0;">
-                        * Since Hytale isn't out, you can test this with a Minecraft server link (e.g., PaperMC).
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button type="button" id="importFromLauncherBtn" style="background: #e67e22; color: white; border: none; padding: 8px 15px; cursor: pointer; flex-grow: 1;">
+                            📥 Import from Hytale Launcher
+                        </button>
+                    </div>
+
+                    <p style="font-size: 0.75rem; color: #aaa; margin-top: 5px;">
+                        <span style="color: #e67e22;">recommended:</span> Copies files from your local game installation.<br>
+                        (Usually: %appdata%\Hytale\install\release\package\game\latest)
                     </p>
 
-                    <div style="display: flex; align-items: center; margin-top: 10px;">
-                        <input type="checkbox" id="autoUpdateCheckbox" style="width: auto; margin-right: 10px;">
-                        <label for="autoUpdateCheckbox" style="margin: 0;">Auto-install/update on Start</label>
+                    <div style="margin-top: 10px; border-top: 1px dashed #444; padding-top: 10px;">
+                        <label style="font-size: 0.8em; color: #666;">Or Custom Download URL:</label>
+                        <input type="text" id="updateUrlInput" placeholder="https://..." style="background: #222; border: 1px solid #333; color: #888;">
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px; padding: 10px; background: #2a2a2a; border: 1px solid #6f42c1; border-radius: 4px;">
+                    <h3 style="margin-top: 0; font-size: 0.9em; color: #d0bfff; border-bottom: 1px solid #6f42c1; padding-bottom: 5px;">Hytale Cloud Services</h3>
+                    
+                    <label for="hytaleApiKey">Server API Key</label>
+                    <input type="password" id="hytaleApiKeyInput" placeholder="sk_live_..." style="background: #1a1a1a; border: 1px solid #444; color: white;">
+                    <p style="font-size: 0.75rem; color: #888; margin-top: 0; margin-bottom: 10px;">
+                        Required for UUID lookups, Telemetry, and Payments.
+                    </p>
+
+                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <input type="checkbox" id="enablePaymentsCheckbox" style="width: auto; margin-right: 10px;">
+                        <label for="enablePaymentsCheckbox" style="margin: 0; color: #ffd700;">Enable Integrated Payments</label>
+                    </div>
+
+                    <div id="paymentSettings" style="display: none; margin-left: 20px; border-left: 2px solid #ffd700; padding-left: 10px;">
+                        <label for="merchantId">Merchant ID</label>
+                        <input type="text" id="merchantIdInput" placeholder="mer_123456789">
                     </div>
                 </div>
 
