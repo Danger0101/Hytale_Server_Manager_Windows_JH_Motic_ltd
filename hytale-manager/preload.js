@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkJarExists: (serverId) => ipcRenderer.invoke('check-jar-exists', serverId),
   importFromLauncher: (serverId) => ipcRenderer.invoke('import-from-launcher', serverId),
   lookupHytalePlayer: (data) => ipcRenderer.invoke('lookup-hytale-player', data),
+  reportPlayer: (serverId, playerId, reason) => ipcRenderer.invoke('report-hytale-player', { serverId, playerId, reason }),
 
   // File Editing
   readFile: (data) => ipcRenderer.invoke('read-file', data),
