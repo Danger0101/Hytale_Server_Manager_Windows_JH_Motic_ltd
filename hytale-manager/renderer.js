@@ -209,8 +209,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if(deleteButton) {
         deleteButton.addEventListener('click', async () => {
             if (!activeServerId) return;
-            if (confirm("Permanently remove this server from the manager? (Files will remain)")) {
-                await window.electronAPI.deleteServer(activeServerId);
+
+            if (confirm("Permanently remove this server from the manager?")) {
+                const deleteFiles = confirm("Also delete all server files from the disk? This cannot be undone.");
+                await window.electronAPI.deleteServer({ serverId: activeServerId, deleteFiles });
                 activeServerId = null;
                 loadServers();
             }
@@ -539,6 +541,24 @@ function generateTextFromForm() {
             // UI Feedback
             const originalText = installBtn.textContent;
             installBtn.disabled = true;
+            installBtn.textContent = "Checking...";
+
+            const versionData = await window.electronAPI.checkHytaleVersion(activeServerId);
+            if (versionData.success) {
+                if (!confirm(`The latest version is "${versionData.data.name}". Do you want to download it?`)) {
+                    installBtn.disabled = false;
+                    installBtn.textContent = originalText;
+                    return;
+                }
+            } else {
+                // If version check fails, ask to proceed anyway
+                if (!confirm(`Could not verify the latest version. Proceed with download anyway?`)) {
+                    installBtn.disabled = false;
+                    installBtn.textContent = originalText;
+                    return;
+                }
+            }
+            
             installBtn.textContent = "Downloading...";
             
             // Log
