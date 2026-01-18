@@ -35,11 +35,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const discordWebhookInput = document.getElementById('discordWebhookInput');
     const uptimeBadge = document.getElementById('uptimeBadge');
 
+    // Hytale Cloud Settings Elements
+    const hytaleApiKeyInput = document.getElementById('hytaleApiKeyInput');
+    const enablePaymentsCheckbox = document.getElementById('enablePaymentsCheckbox');
+    const paymentSettings = document.getElementById('paymentSettings');
+    const merchantIdInput = document.getElementById('merchantIdInput');
+
+    // Toggle Visibility for Payment Settings
+    if (enablePaymentsCheckbox) {
+        enablePaymentsCheckbox.addEventListener('change', () => {
+            paymentSettings.style.display = enablePaymentsCheckbox.checked ? 'block' : 'none';
+        });
+    }
+
     // Add these to the top list
     const editSettingsBtn = document.getElementById('editSettingsBtn');
     const installBtn = document.getElementById('installBtn');
     const updateUrlInput = document.getElementById('updateUrlInput');
     const autoUpdateCheckbox = document.getElementById('autoUpdateCheckbox');
+
+    // Add to Elements
+    const importFromLauncherBtn = document.getElementById('importFromLauncherBtn');
 
     // --- Global Timer Variable ---
     let uptimeInterval = null;
@@ -149,6 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
             discordWebhookInput.value = server.discordWebhook || '';
             updateUrlInput.value = server.updateUrl || '';
             autoUpdateCheckbox.checked = server.autoUpdate || false;
+
+            // Load Hytale Cloud Settings
+            hytaleApiKeyInput.value = server.hytaleApiKey || '';
+            enablePaymentsCheckbox.checked = server.enablePayments || false;
+            merchantIdInput.value = server.merchantId || '';
+            // Trigger visual state
+            paymentSettings.style.display = server.enablePayments ? 'block' : 'none';
         } else {
             modalTitle.textContent = 'Add a New Server';
             serverIdInput.value = '';
@@ -217,6 +240,31 @@ document.addEventListener('DOMContentLoaded', () => {
             showModal(server); // Reuses your existing modal!
         });
     }
+
+// Add Listener
+if (importFromLauncherBtn) {
+    importFromLauncherBtn.addEventListener('click', async () => {
+        // We need a temporary or active ID. If creating new, we might not have ID yet.
+        // For simplicity, this button works best on "Edit Server" (Active ID).
+        if (!activeServerId && serverIdInput.value === "") {
+            alert("Please save the server first, then Edit it to import files.");
+            return;
+        }
+
+        // Use the ID from the form or active
+        const targetId = activeServerId || serverIdInput.value;
+
+        importFromLauncherBtn.disabled = true;
+        importFromLauncherBtn.textContent = "Searching & Copying...";
+
+        const result = await window.electronAPI.importFromLauncher(targetId);
+
+        alert(result.message);
+
+        importFromLauncherBtn.disabled = false;
+        importFromLauncherBtn.textContent = "📥 Import from Hytale Launcher";
+    });
+}
 
 // --- CONFIG EDITOR LOGIC (Hybrid) ---
 
@@ -427,7 +475,10 @@ function generateTextFromForm() {
             javaPath: javaPathInput.value,
             discordWebhook: discordWebhookInput.value.trim(),
             updateUrl: updateUrlInput.value.trim(),
-            autoUpdate: autoUpdateCheckbox.checked
+            autoUpdate: autoUpdateCheckbox.checked,
+            hytaleApiKey: hytaleApiKeyInput.value.trim(),
+            enablePayments: enablePaymentsCheckbox.checked,
+            merchantId: merchantIdInput.value.trim()
         };
 
         if (serverData.id) { // Update existing
@@ -502,6 +553,12 @@ function generateTextFromForm() {
 
     window.electronAPI.onServerLog(({ serverId, log }) => {
         if (!serverStates.has(serverId)) return;
+        
+        // Check if it's the Auth Message (Simple check)
+        if (log.includes('accounts.hytale.com/device')) {
+            // Extract URL and Code roughly
+            alert("ACTION REQUIRED:\n\nThe server needs you to log in.\n\nCheck the console for the Link and Code!");
+        }
         
         const state = serverStates.get(serverId);
         state.console += log;
@@ -682,12 +739,43 @@ function renderPlayerList() {
 
 // 5. Add Player Logic
 addPlayerBtn.addEventListener('click', async () => {
-    const name = newPlayerInput.value.trim();
-    if (!name) return;
+    const nameInput = newPlayerInput.value.trim();
+    if (!nameInput) return;
 
-    // Standard Format: Object with name, uuid, created date
+    // UI Feedback
+    addPlayerBtn.disabled = true;
+    addPlayerBtn.textContent = "Verifying...";
+
+    let playerProfile = { name: nameInput, id: null }; // Default to offline if lookup fails
+
+    // 1. Try to fetch UUID from Hytale API
+    // We need to know if we have an API key first
+    const servers = await window.electronAPI.getServers(); // Or cache this
+    const server = servers.find(s => s.id === activeServerId);
+
+    if (server && server.hytaleApiKey) {
+        const result = await window.electronAPI.lookupHytalePlayer({ 
+            serverId: activeServerId, 
+            playerName: nameInput 
+        });
+
+        if (result.success) {
+            playerProfile = result.profile; // Uses the official Name and UUID
+            console.log("Verified Hytale Profile:", playerProfile);
+        } else {
+            // Optional: Warn user if verification failed
+            if(!confirm(`Could not verify "${nameInput}" with Hytale API. \nError: ${result.error}\n\nAdd anyway (Offline Mode)?`)) {
+                addPlayerBtn.disabled = false;
+                addPlayerBtn.textContent = "Add";
+                return;
+            }
+        }
+    }
+
+    // 2. Add to List
     const newEntry = {
-        name: name,
+        name: playerProfile.name,
+        uuid: playerProfile.id || "offline-uuid", // Hytale servers require UUIDs
         created: new Date().toISOString(),
         source: "Manager"
     };
@@ -695,7 +783,10 @@ addPlayerBtn.addEventListener('click', async () => {
     currentPlayerList.push(newEntry);
     await savePlayerList();
     
+    // Reset UI
     newPlayerInput.value = '';
+    addPlayerBtn.disabled = false;
+    addPlayerBtn.textContent = "Add";
     renderPlayerList();
 });
 
