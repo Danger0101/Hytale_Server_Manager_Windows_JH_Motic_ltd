@@ -170,6 +170,7 @@ body {
     border: 1px solid #555;
     color: white;
     border-radius: 3px;
+    box-sizing: border-box; /* Added to ensure consistency */
 }
 
 /* --- MODALS --- */
