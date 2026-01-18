@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backupServer: (serverId) => ipcRenderer.invoke('backup-server', serverId),
   installServerJar: (serverId) => ipcRenderer.invoke('install-server-jar', serverId),
   checkJarExists: (serverId) => ipcRenderer.invoke('check-jar-exists', serverId),
+  importFromLauncher: (serverId) => ipcRenderer.invoke('import-from-launcher', serverId),
+  lookupHytalePlayer: (data) => ipcRenderer.invoke('lookup-hytale-player', data),
 
   // File Editing
   readFile: (data) => ipcRenderer.invoke('read-file', data),
@@ -20,7 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Server Interaction ---
   startServer: (serverId) => ipcRenderer.send('start-server', serverId),
   stopServer: (serverId) => ipcRenderer.send('stop-server', serverId),
-  sendCommand: (serverId, command) => ipcRenderer.send('send-command', serverId, command),
+  sendCommand: (data) => ipcRenderer.send('send-command', data),
 
   // --- Listeners from Main ---
   onServerLog: (callback) => ipcRenderer.on('server-log', (_event, value) => callback(value)),
