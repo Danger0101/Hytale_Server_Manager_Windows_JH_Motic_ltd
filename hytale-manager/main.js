@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
+const https = require('https');
 const { spawn } = require('child_process');
 
 // --- Add this helper function at the very top of main.js ---
@@ -285,28 +286,6 @@ ipcMain.handle('save-file', async (event, { serverId, filename, content }) => {
     }
 });
 
-// --- Discord Helper ---
-async function sendDiscordNotification(webhookUrl, message, color = 5814783) {
-    if (!webhookUrl || !webhookUrl.startsWith('http')) return;
-    
-    try {
-        await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                embeds: [{
-                    description: `**${message}**`,
-                    color: color, // Decimal color code
-                    footer: { text: "Hytale Server Manager" },
-                    timestamp: new Date().toISOString()
-                }]
-            })
-        });
-    } catch (err) {
-        console.error("Failed to send Discord webhook:", err.message);
-    }
-}
-
 // --- Player History Logic ---
 async function updatePlayerHistory(server, playerName, action) {
     const historyFile = path.join(server.path, 'player-history.json');
@@ -342,3 +321,68 @@ async function updatePlayerHistory(server, playerName, action) {
     // 3. Save back to file
     await fs.writeFile(historyFile, JSON.stringify(history, null, 2));
 }
+
+// --- INSTALLER / UPDATER LOGIC ---
+ipcMain.handle('install-server-jar', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    
+    if (!server) return { success: false, message: 'Server not found.' };
+    if (!server.updateUrl) return { success: false, message: 'No Download URL set in server settings.' };
+
+    const jarPath = path.join(server.path, server.jarFile);
+    const backupPath = path.join(server.path, server.jarFile + '.bak');
+
+    // 1. BACKUP: If a jar already exists, rename it to .bak
+    if (require('fs').existsSync(jarPath)) {
+        try {
+            await fs.cp(jarPath, backupPath);
+        } catch (e) {
+            return { success: false, message: 'Backup failed (file might be in use): ' + e.message };
+        }
+    }
+
+    // 2. DOWNLOAD: Fetch the new file
+    return new Promise((resolve) => {
+        const file = require('fs').createWriteStream(jarPath);
+        
+        const request = https.get(server.updateUrl, (response) => {
+            // Check success
+            if (response.statusCode !== 200) {
+                if(require('fs').existsSync(backupPath)) {
+                    // Restore backup if download fails
+                    require('fs').copyFileSync(backupPath, jarPath); 
+                }
+                resolve({ success: false, message: `Download failed (HTTP ${response.statusCode}). Check URL.` });
+                return;
+            }
+
+            response.pipe(file);
+
+            file.on('finish', () => {
+                file.close();
+                resolve({ success: true, message: 'Download Complete! Server is ready.' });
+            });
+        });
+
+        request.on('error', (err) => {
+            // Restore backup on error
+            if(require('fs').existsSync(backupPath)) {
+                require('fs').copyFileSync(backupPath, jarPath);
+            }
+            resolve({ success: false, message: `Network Error: ${err.message}` });
+        });
+    });
+});
+
+// --- CHECK IF INSTALLED ---
+ipcMain.handle('check-jar-exists', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return false;
+    
+    const jarPath = path.join(server.path, server.jarFile);
+    return require('fs').existsSync(jarPath);
+});
+
+// --- Discord Helper ---
