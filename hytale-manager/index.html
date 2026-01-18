@@ -76,6 +76,7 @@
         <form id="serverForm" style="display: flex; flex-direction: column; height: 100%;">
             <div class="modal-body">
                 <input type="hidden" id="serverId">
+                <input type="hidden" id="refreshTokenInput">
                 <h2 id="modalTitle" style="margin-top:0;">Edit Server</h2>
 
                 <div id="tab-general" class="tab-content active">
@@ -89,9 +90,16 @@
                     </div>
                     
                     <label for="jarFileInput">JAR File Name</label>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
                         <input type="text" id="jarFileInput" required value="hytale-server.jar" style="flex-grow: 1;">
                         <button type="button" id="jarBrowseBtn" style="padding: 0 15px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">Select File</button>
+                    </div>
+
+                    <div id="jarStatusArea" style="display:none; margin-bottom: 15px; padding: 10px; background: #3e2a2a; border: 1px solid #d9534f; border-radius: 4px; color: #ffcccc; font-size: 0.9em;">
+                        <strong>⚠️ File Missing:</strong> The server JAR was not found.
+                        <button type="button" id="quickDownloadBtn" style="margin-left: 10px; padding: 5px 10px; background: #d9534f; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">
+                            ⬇ Download Now
+                        </button>
                     </div>
 
                     <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
@@ -170,9 +178,21 @@
                     </div>
 
                     <div style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 15px;">
-                        <h3 style="margin: 0 0 10px 0; color: #fff;">Authentication (Advanced)</h3>
+                        <h3 style="margin: 0 0 10px 0; color: #fff;">Server Authentication</h3>
+                        
+                        <div id="authStatusArea" style="margin-bottom: 15px;">
+                            <button type="button" id="startAuthBtn" style="width: 100%; padding: 10px; background: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                                🔑 Login to Hytale (Device Auth)
+                            </button>
+                            <div id="authCodeDisplay" style="display:none; margin-top: 10px; padding: 10px; background: #333; text-align: center;">
+                                <p>Go to: <a id="authUrl" href="#" style="color: #4CAF50;">...</a></p>
+                                <p style="font-size: 1.2em; font-weight: bold; letter-spacing: 2px;" id="authCode">...</p>
+                                <p style="font-size: 0.8em; color: #aaa;">Waiting for you to log in...</p>
+                            </div>
+                        </div>
+
                         <p style="font-size: 0.8em; color: #888; margin-bottom: 10px;">
-                            For automated hosting. Leave blank for interactive mode.
+                            Or enter tokens manually (Method C):
                         </p>
                         <label>Session Token</label>
                         <input type="password" id="authSessionTokenInput" placeholder="JWT Session Token">
@@ -250,6 +270,29 @@
             <ul id="playerList" style="list-style: none; padding: 0;">
                 </ul>
         </div>
+    </div>
+</div>
+<div id="deviceAuthModal" class="modal" style="display: none; z-index: 2000;">
+    <div class="modal-content" style="max-width: 400px; text-align: center; border: 1px solid #6f42c1;">
+        <h2 style="color: #6f42c1;">🔐 Authentication Required</h2>
+        <p style="color: #ccc;">The Hytale Tool needs your permission.</p>
+        
+        <div style="background: #111; padding: 15px; border-radius: 4px; margin: 15px 0;">
+            <div style="font-size: 0.8em; color: #888; margin-bottom: 5px;">USER CODE</div>
+            <div id="deviceAuthCode" style="font-size: 2em; font-weight: bold; letter-spacing: 3px; color: #fff; cursor: pointer;" title="Click to Copy">
+                ----
+            </div>
+        </div>
+
+        <p>1. Copy the code above.<br>2. Click the button below to open the login page.<br>3. Paste the code.</p>
+
+        <a id="deviceAuthLink" href="#" target="_blank" style="display: inline-block; background: #6f42c1; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; margin-bottom: 10px;">
+            Open Login Page ↗
+        </a>
+        
+        <button id="closeAuthModal" style="background: transparent; border: 1px solid #444; color: #888; padding: 5px 10px; margin-top: 10px; cursor: pointer;">
+            Close / I have finished
+        </button>
     </div>
 </div>
 </body>
