@@ -233,6 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const openBackupsBtn = document.getElementById('openBackupsBtn');
+    if (openBackupsBtn) {
+        openBackupsBtn.addEventListener('click', () => {
+            if (!activeServerId) return;
+            window.electronAPI.openBackupFolder(activeServerId);
+        });
+    }
+
     if(editSettingsBtn) {
         editSettingsBtn.addEventListener('click', () => {
             if(!activeServerId) return;
