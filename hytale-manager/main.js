@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const https = require('https');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process'); // Added exec for unzipping
 
 // --- Add this helper function at the very top of main.js ---
 function getJavaExecutable(serverConfig) {
@@ -89,11 +89,11 @@ app.on('before-quit', (event) => {
 
 // --- Server Management IPC ---
 
-ipcMain.handle('get-servers', async () => {
+icpMain.handle('get-servers', async () => {
     return await readServersConfig();
 });
 
-ipcMain.handle('add-server', async (event, serverData) => {
+icpMain.handle('add-server', async (event, serverData) => {
     const servers = await readServersConfig();
     const newServer = { ...serverData, id: `srv-${Date.now()}` };
     servers.push(newServer);
@@ -101,7 +101,7 @@ ipcMain.handle('add-server', async (event, serverData) => {
     return newServer;
 });
 
-ipcMain.handle('update-server', async (event, serverData) => {
+icpMain.handle('update-server', async (event, serverData) => {
     const servers = await readServersConfig();
     const index = servers.findIndex(s => s.id === serverData.id);
     if (index !== -1) {
@@ -111,7 +111,7 @@ ipcMain.handle('update-server', async (event, serverData) => {
     }
 });
 
-ipcMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
+icpMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
     let servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
 
@@ -141,18 +141,18 @@ ipcMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
     return true;
 });
 
-ipcMain.handle('select-directory', async () => {
+icpMain.handle('select-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory']
     });
     return result.filePaths[0];
 });
 
-ipcMain.on('open-folder', (event, folderPath) => {
+icpMain.on('open-folder', (event, folderPath) => {
     shell.openPath(folderPath);
 });
 
-ipcMain.handle('open-backup-folder', async (event, serverId) => {
+icpMain.handle('open-backup-folder', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return;
@@ -168,7 +168,7 @@ ipcMain.handle('open-backup-folder', async (event, serverId) => {
 });
 
 // --- Backup Logic ---
-ipcMain.handle('backup-server', async (event, serverId) => {
+icpMain.handle('backup-server', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return { success: false, message: 'Server not found' };
@@ -199,7 +199,7 @@ ipcMain.handle('backup-server', async (event, serverId) => {
 // --- Server Interaction IPC ---
 
 // --- Update the start-server handler ---
-ipcMain.on('start-server', async (event, serverId) => {
+icpMain.on('start-server', async (event, serverId) => {
     if (runningServers.has(serverId)) {
         mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Server is already running.\n' });
         return;
@@ -266,7 +266,7 @@ ipcMain.on('start-server', async (event, serverId) => {
 
     // 1. Send START Notification (Green Color: 5763719)
     
-    sendDiscordNotification(serverConfig.discordWebhook, `🟢 Server "${serverConfig.name}" is Starting...`, 5763719);
+    sendDiscordNotification(serverConfig.discordWebhook, `✅ Server "${serverConfig.name}" is Starting...`, 5763719);
 
     serverProcess.stdout.on('data', (data) => {
         const logLine = data.toString();
@@ -292,7 +292,7 @@ ipcMain.on('start-server', async (event, serverId) => {
             updatePlayerHistory(serverConfig, playerName, 'join');
             // Discord Alert
             
-            sendDiscordNotification(serverConfig.discordWebhook, `👤 ${playerName} joined the server!`, 3447003);
+            sendDiscordNotification(serverConfig.discordWebhook, `➡️ ${playerName} joined the server!`, 3447003);
         }
         if (leaveMatch) {
             updatePlayerHistory(serverConfig, leaveMatch[1], 'leave');
@@ -315,7 +315,7 @@ ipcMain.on('start-server', async (event, serverId) => {
         
         // 3. Send STOP Notification (Red Color: 15548997)
         
-        sendDiscordNotification(serverConfig.discordWebhook, `🔴 Server "${serverConfig.name}" has stopped.`, 15548997);
+        sendDiscordNotification(serverConfig.discordWebhook, `🛑 Server "${serverConfig.name}" has stopped.`, 15548997);
     });
 
     serverProcess.on('error', (err) => {
@@ -325,7 +325,7 @@ ipcMain.on('start-server', async (event, serverId) => {
     });
 });
 
-ipcMain.on('stop-server', (event, serverId) => {
+icpMain.on('stop-server', (event, serverId) => {
     const serverProcess = runningServers.get(serverId);
     if (!serverProcess) {
         mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Server is not running.\n' });
@@ -335,7 +335,7 @@ ipcMain.on('stop-server', (event, serverId) => {
     serverProcess.stdin.write('stop\n');
 });
 
-ipcMain.on('send-command', (event, { serverId, command }) => {
+icpMain.on('send-command', (event, { serverId, command }) => {
     const serverProcess = runningServers.get(serverId);
     if (serverProcess && serverProcess.stdin.writable) {
         serverProcess.stdin.write(command + '\n');
@@ -346,7 +346,7 @@ ipcMain.on('send-command', (event, { serverId, command }) => {
 
 // --- Config Editor Logic ---
 
-ipcMain.handle('read-file', async (event, { serverId, filename }) => {
+icpMain.handle('read-file', async (event, { serverId, filename }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) throw new Error("Server not found");
@@ -361,7 +361,7 @@ ipcMain.handle('read-file', async (event, { serverId, filename }) => {
     }
 });
 
-ipcMain.handle('save-file', async (event, { serverId, filename, content }) => {
+icpMain.handle('save-file', async (event, { serverId, filename, content }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) throw new Error("Server not found");
@@ -463,14 +463,14 @@ async function downloadServerJar(server, mainWindow) {
     });
 }
 
-ipcMain.handle('install-server-jar', async (event, serverId) => {
+icpMain.handle('install-server-jar', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     return await downloadServerJar(server, mainWindow);
 });
 
 // --- CHECK IF INSTALLED ---
-ipcMain.handle('check-jar-exists', async (event, serverId) => {
+icpMain.handle('check-jar-exists', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return false;
@@ -480,7 +480,7 @@ ipcMain.handle('check-jar-exists', async (event, serverId) => {
 });
 
 // --- REAL HYTALE INSTALLER LOGIC ---
-ipcMain.handle('import-from-launcher', async (event, serverId) => {
+icpMain.handle('import-from-launcher', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return { success: false, message: 'Server not found.' };
@@ -543,49 +543,70 @@ ipcMain.handle('import-from-launcher', async (event, serverId) => {
 
 // --- NEW: HYTALE DOWNLOADER CLI INTEGRATION ---
 
+// 1. Updated Helper: Chooses correct binary based on OS
 function getDownloaderPath() {
-    // Look for the tool in the 'bin' folder we created
-    const bundledPath = path.join(__dirname, 'bin', 'hytale-downloader.exe'); // Add .exe extension if Windows-only
-    return bundledPath;
+    const isWin = process.platform === 'win32';
+    // Matches the files you listed: 
+    const filename = isWin ? 'hytale-downloader-windows-amd64.exe' : 'hytale-downloader-linux-amd64';
+    return path.join(__dirname, 'bin', filename);
 }
 
-ipcMain.handle('install-via-cli', async (event, serverId) => {
+// 2. Helper: Unzip function using system tools
+async function extractZip(zipPath, destDir) {
+    if (process.platform === 'win32') {
+        // PowerShell Expansion
+        return new Promise((resolve, reject) => {
+            const cmd = `powershell -command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destDir}' -Force"`;
+            exec(cmd, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    } else {
+        // Linux/Mac: unzip command
+        return new Promise((resolve, reject) => {
+            exec(`unzip -o "${zipPath}" -d "${destDir}"`, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
+}
+
+icpMain.handle('install-via-cli', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return { success: false, message: 'Server not found.' };
 
     const toolPath = getDownloaderPath();
     
-    // 1. Check if tool exists
+    // Check if tool exists
     try {
         require('fs').accessSync(toolPath);
+        
+        // Ensure Linux binary is executable
+        if (process.platform !== 'win32') {
+             try { require('fs').chmodSync(toolPath, '755'); } catch(e) {}
+        }
     } catch (e) {
-        return { success: false, message: `Downloader Tool not found at: ${toolPath}. Please download it and place it in the 'bin' folder.` };
+        return { success: false, message: `Downloader Tool not found at: ${toolPath}. Please ensure the binary is in the 'bin' folder.` };
     }
 
-    // 2. Prepare Command
-    // We run it inside the server's directory so it downloads files there.
-    // Manual says: "./hytale-downloader" downloads latest release.
     const cwd = server.path;
-    
-    // Ensure server directory exists
     try { await fs.mkdir(cwd, { recursive: true }); } catch (e) {}
 
     return new Promise((resolve) => {
-        mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Launching Hytale Downloader CLI...\n` });
+        mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Launching Hytale Downloader CLI (${path.basename(toolPath)})...
+` });
 
         // Spawn the tool
         const downloader = spawn(toolPath, [], { cwd });
 
-        // 3. Handle Output (Crucial for Auth)
+        // Handle Output
         downloader.stdout.on('data', (data) => {
             const line = data.toString();
-            
-            // Forward output to console
             mainWindow.webContents.send('server-log', { serverId, log: line });
 
-            // DETECT AUTH REQUEST (Just like the server)
-            // If the downloader asks for auth, show the popup
             if (line.includes('accounts.hytale.com/device')) {
                 mainWindow.webContents.send('auth-needed', line);
             }
@@ -595,8 +616,33 @@ ipcMain.handle('install-via-cli', async (event, serverId) => {
             mainWindow.webContents.send('server-log', { serverId, log: `[CLI Error] ${data.toString()}` });
         });
 
-        downloader.on('close', (code) => {
+        downloader.on('close', async (code) => {
             if (code === 0) {
+                // SUCCESS! Now check if files are zipped.
+                const jarExists = require('fs').existsSync(path.join(cwd, 'hytale-server.jar'));
+                
+                if (!jarExists) {
+                    // Look for zips
+                    try {
+                        const files = await fs.readdir(cwd);
+                        const zipFile = files.find(f => f.endsWith('.zip') && !f.includes('Assets')); // Ignore Assets.zip, look for game zip
+                        
+                        if (zipFile) {
+                            mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Found ${zipFile}. Extracting...\n` });
+                            try {
+                                await extractZip(path.join(cwd, zipFile), cwd);
+                                mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Extraction complete.\n` });
+                                resolve({ success: true, message: 'Download & Extraction finished successfully.' });
+                                return;
+                            } catch (err) {
+                                mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Extraction failed: ${err.message}\n` });
+                                resolve({ success: false, message: 'Download finished, but unzip failed.' });
+                                return;
+                            }
+                        }
+                    } catch (e) {}
+                }
+
                 resolve({ success: true, message: 'Hytale Downloader finished successfully.' });
             } else {
                 resolve({ success: false, message: `Downloader failed with exit code ${code}. Check logs.` });
@@ -639,7 +685,7 @@ async function hytaleApiRequest(endpoint, apiKey, params = {}) {
 }
 
 // 1. UUID Lookup Handler
-ipcMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) => {
+icpMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     
@@ -658,7 +704,7 @@ ipcMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) =
 });
 
 // 2. Version Check Handler
-ipcMain.handle('check-hytale-version', async (event, serverId) => {
+icpMain.handle('check-hytale-version', async (event, serverId) => {
     // This endpoint might be public, but using API Key ensures better rate limits
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
@@ -668,7 +714,7 @@ ipcMain.handle('check-hytale-version', async (event, serverId) => {
 });
 
 // Add this near your other Hytale API handlers
-ipcMain.handle('report-hytale-player', async (event, { serverId, playerId, reason }) => {
+icpMain.handle('report-hytale-player', async (event, { serverId, playerId, reason }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     
