@@ -23,3 +23,5 @@ Thumbs.db
 # --- User Data ---
 # Ignore the local server list so your personal saves aren't committed
 **/servers.json
+
+**/.hytale-manager/bin/.hytale-downloader-credentials.json
