@@ -1,299 +1,124 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self';">
     <title>Hytale Server Manager</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="main-grid">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>Servers</h2>
-                <button id="addServerBtn" class="add-btn">+</button>
+    <div id="app">
+        <div id="sidebar">
+            <h1>Servers</h1>
+            <ul id="serverList"></ul>
+            <button id="addServerBtn">Add Server</button>
+        </div>
+        <div id="mainContent">
+            <div id="welcomeView" style="display: none;">
+                <h2>Welcome to Hytale Server Manager!</h2>
+                <p>Add your first server to get started.</p>
+                <button id="initialAddServerBtn">Add Server</button>
             </div>
-            <ul id="serverList" class="server-list">
-                <!-- Server items will be dynamically inserted here -->
-            </ul>
-        </aside>
-
-        <div id="welcomeView" class="welcome-view">
-            <h2>Welcome to Hytale Server Manager</h2>
-            <p>Select a server from the list to get started, or add a new one.</p>
-            <button id="initialAddServerBtn">Add Your First Server</button>
-        </div>
-        
-        <div id="serverView" class="server-view" style="display: none;">
-            <header class="header">
-                <h1 id="serverNameTitle"></h1>
-                <div style="margin-left: 20px; font-size: 0.9rem; color: #aaa;">
-                    <span>IP: <strong id="publicIpLabel" style="color: white; cursor: copy;" title="Your Public IP">...</strong></span>
-                    <span style="margin: 0 10px;">|</span>
-                    <span id="aotStatusBadge">Checking...</span>
+            <div id="serverView" style="display: none;">
+                <h2 id="serverNameTitle"></h2>
+                <div class="server-controls">
+                    <button id="startButton">Start</button>
+                    <button id="stopButton">Stop</button>
+                    <input type="text" id="commandInput" placeholder="Enter command">
+                    <button id="sendCommandBtn">Send Command</button>
+                    <button id="quickDownloadBtn">Quick Download</button>
                 </div>
-                <div id="uptimeBadge" style="display:none; background: #222; padding: 5px 10px; border-radius: 4px; border: 1px solid #444; font-family: monospace; color: #4CAF50;">
-                    Online: 00:00:00
+                <div id="jarStatusArea" style="display: none; color: orange; margin-top: 10px;">
+                    Warning: JAR file not found. Use Hytale Downloader CLI to install.
                 </div>
-                <div class="controls">
-    <button id="startButton">Start Server</button>
-    <button id="stopButton">Stop Server</button>
-    <button id="installBtn" style="background-color: #d35400; color: #fff; margin-left: 10px;">Check for Updates</button>
-    <div style="margin-left: 20px; display: inline-block;">
-        <button id="editSettingsBtn" style="background-color: #f0ad4e; color: #fff;">Edit Settings</button>
-        <button id="configBtn" style="background-color: #5bc0de; color: #fff; margin-left: 5px;">Server Config</button>
-        <button id="playerManagerBtn" style="background-color: #6f42c1; color: #fff; margin-left: 5px;">Player Lists</button>
-    </div>
-    <div style="float: right;">
-        <button id="backupButton" style="background-color: #007acc;">Backup</button>
-        <button id="openBackupsBtn" style="background-color: #007acc; margin-left: 5px;">Open Backups</button>
-        <button id="deleteButton" style="background-color: #555; margin-left: 5px;">Delete</button>
-    </div>
-</div>
-            </header>
-    
-            <main class="console-container">
-                <pre id="console" class="console"></pre>
-            </main>
-    
-            <footer class="footer">
-                <input type="text" id="commandInput" placeholder="Enter server command and press Enter...">
-            </footer>
+                <div id="console" style="background-color: black; color: white; height: 300px; overflow-y: scroll; margin-top: 10px; padding: 10px;"></div>
+            </div>
         </div>
     </div>
 
-<div id="serverModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <span class="close-button" style="z-index: 10; top: 10px; right: 15px;">&times;</span>
-        
-        <div class="modal-tabs">
-            <button type="button" class="modal-tab-btn active" data-tab="tab-general">General</button>
-            <button type="button" class="modal-tab-btn" data-tab="tab-install">Installation</button>
-            <button type="button" class="modal-tab-btn" data-tab="tab-cloud">Cloud & Auth</button>
-        </div>
-
-        <form id="serverForm" style="display: flex; flex-direction: column; height: 100%;">
-            <div class="modal-body">
+    <!-- Server Modal -->
+    <div id="serverModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modalTitle">Add New Server</h2>
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" data-tab="tab-general">General</button>
+                <button class="modal-tab-btn" data-tab="tab-advanced">Advanced</button>
+                <button class="modal-tab-btn" data-tab="tab-hytale-cloud">Hytale Cloud</button>
+            </div>
+            <form id="serverForm">
                 <input type="hidden" id="serverId">
-                <input type="hidden" id="refreshTokenInput">
-                <h2 id="modalTitle" style="margin-top:0;">Edit Server</h2>
-
                 <div id="tab-general" class="tab-content active">
-                    <label for="serverNameInput">Server Name</label>
-                    <input type="text" id="serverNameInput" required placeholder="e.g., My Survival World">
-                    
-                    <label for="serverPathInput">Server Path</label>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <input type="text" id="serverPathInput" required placeholder="C:\HytaleServers\Survival" style="flex-grow: 1; margin-bottom: 0;">
-                        <button type="button" id="browseBtn" style="padding: 0 15px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">Browse</button>
-                    </div>
-                    
-                    <label for="jarFileInput">JAR File Name</label>
-                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
-                        <input type="text" id="jarFileInput" required value="hytale-server.jar" style="flex-grow: 1;">
-                        <button type="button" id="jarBrowseBtn" style="padding: 0 15px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">Select File</button>
-                    </div>
-
-                    <div id="jarStatusArea" style="display:none; margin-bottom: 15px; padding: 10px; background: #3e2a2a; border: 1px solid #d9534f; border-radius: 4px; color: #ffcccc; font-size: 0.9em;">
-                        <strong>⚠️ File Missing:</strong> The server JAR was not found.
-                        <button type="button" id="quickDownloadBtn" style="margin-left: 10px; padding: 5px 10px; background: #d9534f; color: white; border: none; border-radius: 3px; cursor: pointer; font-weight: bold;">
-                            ⬇ Download Now
-                        </button>
-                    </div>
-
-                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
-                        <label>Java Settings (Advanced)</label>
-                        
-                        <button type="button" id="checkJavaBtn" style="width: 100%; margin-bottom: 10px; background: #444; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">
-                            🔍 Check / Install Java 25
-                        </button>
-
-                        <input type="text" id="javaArgsInput" placeholder="Arguments (e.g. -Xmx4G)">
-                        <input type="text" id="javaPathInput" placeholder="Custom Java Path (Leave blank to use bundled)">
-                    </div>
+                    <label for="serverNameInput">Server Name:</label>
+                    <input type="text" id="serverNameInput" required>
+                    <label for="serverPathInput">Server Path:</label>
+                    <input type="text" id="serverPathInput" readonly required>
+                    <button type="button" id="browseBtn">Browse</button>
+                    <label for="jarFileInput">Server JAR File:</label>
+                    <input type="text" id="jarFileInput" placeholder="e.g., hytale-server.jar" required>
+                    <button type="button" id="jarBrowseBtn">Browse</button>
                 </div>
-
-                <div id="tab-install" class="tab-content">
-                    <div style="background: #2a2a2a; border: 1px solid #444; border-radius: 4px; padding: 15px;">
-                        <h3 style="margin-top: 0; color: #fff;">Server Files</h3>
-                        <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">
-                            Choose how to get your server files. 
-                            <br><strong style="color: #e67e22;">Note:</strong> Clicking these will auto-save the server first.
-                        </p>
-
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <button type="button" id="installCliBtn" style="background: #2980b9; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 4px; text-align: left;">
-                                ☁️ <strong>Hytale Downloader</strong><br>
-                                <span style="font-size: 0.8em; opacity: 0.8;">Download latest files directly from Hytale (Requires Auth).</span>
-                            </button>
-
-                            <button type="button" id="importFromLauncherBtn" style="background: #e67e22; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 4px; text-align: left;">
-                                📥 <strong>Import from Launcher</strong><br>
-                                <span style="font-size: 0.8em; opacity: 0.8;">Copy files from your local game install.</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 20px;">
-                        <label>Custom Update URL</label>
-                        <input type="text" id="updateUrlInput" placeholder="https://example.com/server.jar">
-                        
-                        <div style="display: flex; align-items: center; margin-top: 10px;">
-                            <input type="checkbox" id="autoUpdateCheckbox" style="width: auto; margin: 0 10px 0 0;">
-                            <label for="autoUpdateCheckbox" style="margin: 0;">Auto-update on start</label>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
-                        <h3 style="margin-top: 0; font-size: 1rem; color: #fff;">Network Setup</h3>
-                        
-                        <div style="display: flex; align-items: center; gap: 10px; background: #2a2a2a; padding: 15px; border-radius: 4px;">
-                            <div style="flex-grow: 1;">
-                                <strong>Windows Firewall Rule</strong>
-                                <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #aaa;">
-                                    Opens UDP Port 5520 so friends can join. Requires Admin approval.
-                                </p>
-                            </div>
-                            <button type="button" id="firewallBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">
-                                🛡️ Open Firewall Port
-                            </button>
-                        </div>
-                    </div>
+                <div id="tab-advanced" class="tab-content">
+                    <label for="javaArgsInput">Java Arguments:</label>
+                    <input type="text" id="javaArgsInput" placeholder="-Xmx4G -Xms2G">
+                    <label for="javaPathInput">Java Executable Path (Optional):</label>
+                    <input type="text" id="javaPathInput" placeholder="C:\Program Files\Java\jdk-21\bin\java.exe">
+                    <button type="button" id="checkJavaBtn">Check Java</button>
+                    <label for="discordWebhookInput">Discord Webhook URL:</label>
+                    <input type="text" id="discordWebhookInput">
+                    <label for="updateUrlInput">Update URL (Optional):</label>
+                    <input type="text" id="updateUrlInput">
+                    <label>
+                        <input type="checkbox" id="autoUpdateCheckbox"> Auto Update
+                    </label>
                 </div>
-
-                <div id="tab-cloud" class="tab-content">
-                    <div style="background: #1e1e1e; border: 1px solid #6f42c1; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
-                        <h3 style="margin: 0 0 10px 0; color: #d0bfff;">Hytale API</h3>
-                        <label>Server API Key</label>
-                        <input type="password" id="hytaleApiKeyInput" placeholder="sk_live_...">
-                        
-                        <div style="display: flex; align-items: center; margin-top: 10px;">
-                            <input type="checkbox" id="enablePaymentsCheckbox" style="width: auto; margin: 0 10px 0 0;">
-                            <label for="enablePaymentsCheckbox" style="margin: 0; color: #ffd700;">Enable Payments</label>
-                        </div>
-                        <div id="paymentSettings" style="display: none; margin-top: 10px; padding-left: 10px; border-left: 2px solid #ffd700;">
-                            <input type="text" id="merchantIdInput" placeholder="Merchant ID" style="margin-bottom: 0;">
-                        </div>
+                <div id="tab-hytale-cloud" class="tab-content">
+                    <label for="hytaleApiKeyInput">Hytale API Key (Optional):</label>
+                    <input type="text" id="hytaleApiKeyInput">
+                    <label>
+                        <input type="checkbox" id="enablePaymentsCheckbox"> Enable Payments Integration
+                    </label>
+                    <div id="paymentSettings" style="display: none;">
+                        <label for="merchantIdInput">Merchant ID:</label>
+                        <input type="text" id="merchantIdInput">
                     </div>
-
-                    <div style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 15px;">
-                        <h3 style="margin: 0 0 10px 0; color: #fff;">Server Authentication</h3>
-                        
-                        <div id="authStatusArea" style="margin-bottom: 15px;">
-                            <button type="button" id="startAuthBtn" style="width: 100%; padding: 10px; background: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                                🔑 Login to Hytale (Device Auth)
-                            </button>
-                            <div id="authCodeDisplay" style="display:none; margin-top: 10px; padding: 10px; background: #333; text-align: center;">
-                                <p>Go to: <a id="authUrl" href="#" style="color: #4CAF50;">...</a></p>
-                                <p style="font-size: 1.2em; font-weight: bold; letter-spacing: 2px;" id="authCode">...</p>
-                                <p style="font-size: 0.8em; color: #aaa;">Waiting for you to log in...</p>
-                            </div>
-                        </div>
-
-                        <p style="font-size: 0.8em; color: #888; margin-bottom: 10px;">
-                            Or enter tokens manually (Method C):
-                        </p>
-                        <label>Session Token</label>
-                        <input type="password" id="authSessionTokenInput" placeholder="JWT Session Token">
-                        <label>Identity Token</label>
-                        <input type="password" id="authIdentityTokenInput" placeholder="JWT Identity Token">
-                    </div>
-
-                    <div style="margin-top: 20px;">
-                        <label>Discord Webhook</label>
-                        <input type="text" id="discordWebhookInput" placeholder="https://discord.com/api/webhooks/...">
-                    </div>
+                    <label for="authSessionTokenInput">Auth Session Token:</label>
+                    <input type="text" id="authSessionTokenInput" readonly>
+                    <label for="authIdentityTokenInput">Auth Identity Token:</label>
+                    <input type="text" id="authIdentityTokenInput" readonly>
+                    <button type="button" id="installCliBtn">☁️ Hytale Downloader CLI</button>
                 </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="submit" id="saveServerBtn">Save Server</button>
-            </div>
-        </form>
+                <button type="submit">Save Server</button>
+            </form>
+        </div>
     </div>
-</div>
 
-    <script src="./renderer.js"></script>
-
-    <div id="configModal" class="modal" style="display: none;">
-    <div class="modal-content" style="width: 80%; max-width: 900px; height: 85vh; display: flex; flex-direction: column;">
-        <span class="close-config">&times;</span>
-        
-        <div class="config-toolbar">
-            <h2 style="margin:0;">Server Configuration</h2>
+    <!-- Authentication Modal (from user's previous input) -->
+    <div id="deviceAuthModal" class="modal" style="display: none; z-index: 2000;">
+        <div class="modal-content" style="max-width: 400px; text-align: center; border: 1px solid #6f42c1;">
+            <h2 style="color: #6f42c1;">🔐 Authentication Required</h2>
+            <p style="color: #ccc;">The Hytale Tool needs your permission.</p>
             
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <select id="configFileSelect" style="padding: 8px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;">
-                    <option value="server.properties">server.properties</option>
-                    <option value="config.json">config.json</option>
-                    <option value="world-settings.json">world-settings.json</option>
-                </select>
-                <button id="loadConfigBtn" style="padding: 8px 15px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px;">Load File</button>
-                <div style="width: 1px; height: 30px; background: #555; margin: 0 10px;"></div>
-                <button id="toggleViewBtn" class="view-toggle-btn">Switch to Text Mode</button>
+            <div style="background: #111; padding: 15px; border-radius: 4px; margin: 15px 0;">
+                <div style="font-size: 0.8em; color: #888; margin-bottom: 5px;">USER CODE</div>
+                <div id="deviceAuthCode" style="font-size: 2em; font-weight: bold; letter-spacing: 3px; color: #fff; cursor: pointer;" title="Click to Copy">
+                    ----
+                </div>
             </div>
-        </div>
 
-        <div id="configFormView" class="config-form-container" style="flex-grow: 1;">
-            <p style="grid-column: span 2; text-align: center; color: #888; margin-top: 50px;">
-                Load a file to see settings here.
-            </p>
-        </div>
+            <p>1. Copy the code above.<br>2. Click the button below to open the login page.<br>3. Paste the code.</p>
 
-        <textarea id="configEditor" style="display: none; flex-grow: 1; background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 15px; border: 1px solid #444; resize: none; line-height: 1.5;"></textarea>
-        
-        <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
-            <button id="saveConfigBtn" style="padding: 12px 25px; background-color: var(--green-btn); color: white; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer;">Save Changes</button>
+            <a id="deviceAuthLink" href="#" target="_blank" style="display: inline-block; background: #6f42c1; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; margin-bottom: 10px;">
+                Open Login Page ↗
+            </a>
+            
+            <button id="closeAuthModal" style="background: transparent; border: 1px solid #444; color: #888; padding: 5px 10px; margin-top: 10px; cursor: pointer;">
+                Close / I have finished
+            </button>
         </div>
     </div>
-</div>
 
-<div id="playerModal" class="modal" style="display: none;">
-    <div class="modal-content" style="width: 500px; height: 600px; display: flex; flex-direction: column;">
-        <span class="close-player">&times;</span>
-        <h2 style="margin-bottom: 15px;">Player Lists</h2>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px;">
-            <button class="tab-btn active" data-file="whitelist.json">Whitelist</button>
-            <button class="tab-btn" data-file="banned-players.json">Banned Players</button>
-            <button class="tab-btn" data-file="ops.json">Operators (Ops)</button>
-            <button class="tab-btn" data-file="player-history.json" style="color: #5bc0de;">History</button>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" id="newPlayerInput" placeholder="Enter player name..." style="flex-grow: 1; padding: 8px; background: #222; border: 1px solid #444; color: white;">
-            <button id="addPlayerBtn" style="background: var(--green-btn); color: white; border: none; padding: 0 15px; cursor: pointer;">Add</button>
-        </div>
-
-        <div style="flex-grow: 1; overflow-y: auto; background: #1e1e1e; border: 1px solid #444; border-radius: 4px;">
-            <ul id="playerList" style="list-style: none; padding: 0;">
-                </ul>
-        </div>
-    </div>
-</div>
-<div id="deviceAuthModal" class="modal" style="display: none; z-index: 2000;">
-    <div class="modal-content" style="max-width: 400px; text-align: center; border: 1px solid #6f42c1;">
-        <h2 style="color: #6f42c1;">🔐 Authentication Required</h2>
-        <p style="color: #ccc;">The Hytale Tool needs your permission.</p>
-        
-        <div style="background: #111; padding: 15px; border-radius: 4px; margin: 15px 0;">
-            <div style="font-size: 0.8em; color: #888; margin-bottom: 5px;">USER CODE</div>
-            <div id="deviceAuthCode" style="font-size: 2em; font-weight: bold; letter-spacing: 3px; color: #fff; cursor: pointer;" title="Click to Copy">
-                ----
-            </div>
-        </div>
-
-        <p>1. Copy the code above.<br>2. Click the button below to open the login page.<br>3. Paste the code.</p>
-
-        <a id="deviceAuthLink" href="#" target="_blank" style="display: inline-block; background: #6f42c1; color: white; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; margin-bottom: 10px;">
-            Open Login Page ↗
-        </a>
-        
-        <button id="closeAuthModal" style="background: transparent; border: 1px solid #444; color: #888; padding: 5px 10px; margin-top: 10px; cursor: pointer;">
-            Close / I have finished
-        </button>
-    </div>
-</div>
+    <script src="renderer.js"></script>
 </body>
 </html>
