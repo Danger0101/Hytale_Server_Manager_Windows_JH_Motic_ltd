@@ -89,11 +89,11 @@ app.on('before-quit', (event) => {
 
 // --- Server Management IPC ---
 
-icpMain.handle('get-servers', async () => {
+ipcMain.handle('get-servers', async () => {
     return await readServersConfig();
 });
 
-icpMain.handle('add-server', async (event, serverData) => {
+ipcMain.handle('add-server', async (event, serverData) => {
     const servers = await readServersConfig();
     const newServer = { ...serverData, id: `srv-${Date.now()}` };
     servers.push(newServer);
@@ -101,7 +101,7 @@ icpMain.handle('add-server', async (event, serverData) => {
     return newServer;
 });
 
-icpMain.handle('update-server', async (event, serverData) => {
+ipcMain.handle('update-server', async (event, serverData) => {
     const servers = await readServersConfig();
     const index = servers.findIndex(s => s.id === serverData.id);
     if (index !== -1) {
@@ -111,7 +111,7 @@ icpMain.handle('update-server', async (event, serverData) => {
     }
 });
 
-icpMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
+ipcMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
     let servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
 
@@ -141,18 +141,18 @@ icpMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
     return true;
 });
 
-icpMain.handle('select-directory', async () => {
+ipcMain.handle('select-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory']
     });
     return result.filePaths[0];
 });
 
-icpMain.on('open-folder', (event, folderPath) => {
+ipcMain.on('open-folder', (event, folderPath) => {
     shell.openPath(folderPath);
 });
 
-icpMain.handle('open-backup-folder', async (event, serverId) => {
+ipcMain.handle('open-backup-folder', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return;
@@ -168,7 +168,7 @@ icpMain.handle('open-backup-folder', async (event, serverId) => {
 });
 
 // --- Backup Logic ---
-icpMain.handle('backup-server', async (event, serverId) => {
+ipcMain.handle('backup-server', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return { success: false, message: 'Server not found' };
@@ -199,7 +199,7 @@ icpMain.handle('backup-server', async (event, serverId) => {
 // --- Server Interaction IPC ---
 
 // --- Update the start-server handler ---
-icpMain.on('start-server', async (event, serverId) => {
+ipcMain.on('start-server', async (event, serverId) => {
     if (runningServers.has(serverId)) {
         mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Server is already running.\n' });
         return;
@@ -325,7 +325,7 @@ icpMain.on('start-server', async (event, serverId) => {
     });
 });
 
-icpMain.on('stop-server', (event, serverId) => {
+ipcMain.on('stop-server', (event, serverId) => {
     const serverProcess = runningServers.get(serverId);
     if (!serverProcess) {
         mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Server is not running.\n' });
@@ -335,7 +335,7 @@ icpMain.on('stop-server', (event, serverId) => {
     serverProcess.stdin.write('stop\n');
 });
 
-icpMain.on('send-command', (event, { serverId, command }) => {
+ipcMain.on('send-command', (event, { serverId, command }) => {
     const serverProcess = runningServers.get(serverId);
     if (serverProcess && serverProcess.stdin.writable) {
         serverProcess.stdin.write(command + '\n');
@@ -346,7 +346,7 @@ icpMain.on('send-command', (event, { serverId, command }) => {
 
 // --- Config Editor Logic ---
 
-icpMain.handle('read-file', async (event, { serverId, filename }) => {
+ipcMain.handle('read-file', async (event, { serverId, filename }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) throw new Error("Server not found");
@@ -361,7 +361,7 @@ icpMain.handle('read-file', async (event, { serverId, filename }) => {
     }
 });
 
-icpMain.handle('save-file', async (event, { serverId, filename, content }) => {
+ipcMain.handle('save-file', async (event, { serverId, filename, content }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) throw new Error("Server not found");
@@ -463,14 +463,14 @@ async function downloadServerJar(server, mainWindow) {
     });
 }
 
-icpMain.handle('install-server-jar', async (event, serverId) => {
+ipcMain.handle('install-server-jar', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     return await downloadServerJar(server, mainWindow);
 });
 
 // --- CHECK IF INSTALLED ---
-icpMain.handle('check-jar-exists', async (event, serverId) => {
+ipcMain.handle('check-jar-exists', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return false;
@@ -480,7 +480,7 @@ icpMain.handle('check-jar-exists', async (event, serverId) => {
 });
 
 // --- REAL HYTALE INSTALLER LOGIC ---
-icpMain.handle('import-from-launcher', async (event, serverId) => {
+ipcMain.handle('import-from-launcher', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return { success: false, message: 'Server not found.' };
@@ -573,7 +573,7 @@ async function extractZip(zipPath, destDir) {
     }
 }
 
-icpMain.handle('install-via-cli', async (event, serverId) => {
+ipcMain.handle('install-via-cli', async (event, serverId) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     if (!server) return { success: false, message: 'Server not found.' };
@@ -685,7 +685,7 @@ async function hytaleApiRequest(endpoint, apiKey, params = {}) {
 }
 
 // 1. UUID Lookup Handler
-icpMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) => {
+ipcMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     
@@ -704,7 +704,7 @@ icpMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) =
 });
 
 // 2. Version Check Handler
-icpMain.handle('check-hytale-version', async (event, serverId) => {
+ipcMain.handle('check-hytale-version', async (event, serverId) => {
     // This endpoint might be public, but using API Key ensures better rate limits
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
@@ -714,7 +714,7 @@ icpMain.handle('check-hytale-version', async (event, serverId) => {
 });
 
 // Add this near your other Hytale API handlers
-icpMain.handle('report-hytale-player', async (event, { serverId, playerId, reason }) => {
+ipcMain.handle('report-hytale-player', async (event, { serverId, playerId, reason }) => {
     const servers = await readServersConfig();
     const server = servers.find(s => s.id === serverId);
     
