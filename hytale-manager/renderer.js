@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add these to the top list
     const editSettingsBtn = document.getElementById('editSettingsBtn');
+    const installBtn = document.getElementById('installBtn');
+    const updateUrlInput = document.getElementById('updateUrlInput');
+    const autoUpdateCheckbox = document.getElementById('autoUpdateCheckbox');
 
     // --- Global Timer Variable ---
     let uptimeInterval = null;
@@ -73,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateServerView() {
+    async function updateServerView() {
         if (!activeServerId) {
             serverView.style.display = 'none';
             return;
@@ -87,10 +90,28 @@ document.addEventListener('DOMContentLoaded', () => {
         consoleDiv.textContent = state.console;
         consoleDiv.scrollTop = consoleDiv.scrollHeight;
         
-        startButton.disabled = state.isRunning;
         stopButton.disabled = !state.isRunning;
         commandInput.disabled = !state.isRunning;
         commandInput.placeholder = state.isRunning ? "Enter server command..." : "Server is offline.";
+
+        // CHECK INSTALL STATUS
+        const isInstalled = await window.electronAPI.checkJarExists(activeServerId);
+        
+        if (installBtn) {
+            if (!isInstalled) {
+                installBtn.textContent = "⬇ Install Server";
+                installBtn.style.backgroundColor = "#e67e22"; // Orange
+                installBtn.title = "Server JAR is missing. Click to download.";
+                startButton.disabled = true; // Cannot start if not installed
+                startButton.textContent = "Install First";
+            } else {
+                installBtn.textContent = "↻ Update Server";
+                installBtn.style.backgroundColor = "#2980b9"; // Blue
+                startButton.textContent = "Start Server";
+                // Start button disabled state handles itself based on isRunning
+                startButton.disabled = state.isRunning;
+            }
+        }
     }
 
     async function switchActiveServer(serverId) {
@@ -126,6 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
             javaArgsInput.value = server.javaArgs || '';
             javaPathInput.value = server.javaPath || '';
             discordWebhookInput.value = server.discordWebhook || '';
+            updateUrlInput.value = server.updateUrl || '';
+            autoUpdateCheckbox.checked = server.autoUpdate || false;
         } else {
             modalTitle.textContent = 'Add a New Server';
             serverIdInput.value = '';
@@ -402,7 +425,9 @@ function generateTextFromForm() {
             jarFile: jarFileInput.value,
             javaArgs: javaArgsInput.value,
             javaPath: javaPathInput.value,
-            discordWebhook: discordWebhookInput.value.trim()
+            discordWebhook: discordWebhookInput.value.trim(),
+            updateUrl: updateUrlInput.value.trim(),
+            autoUpdate: autoUpdateCheckbox.checked
         };
 
         if (serverData.id) { // Update existing
@@ -436,6 +461,42 @@ function generateTextFromForm() {
             }
         }
     });
+
+    function addLog(log) {
+        if (!activeServerId || !serverStates.has(activeServerId)) return;
+        const state = serverStates.get(activeServerId);
+        state.console += log;
+        if (state.console.length > 20000) {
+            state.console = state.console.substring(state.console.length - 15000);
+        }
+        consoleDiv.textContent = state.console;
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!activeServerId) return;
+    
+            // UI Feedback
+            const originalText = installBtn.textContent;
+            installBtn.disabled = true;
+            installBtn.textContent = "Downloading...";
+            
+            // Log
+            addLog('[Manager] Starting download...\n');
+    
+            // Run Install
+            const result = await window.electronAPI.installServerJar(activeServerId);
+            
+            alert(result.message);
+            addLog(`[Manager] ${result.message}\n`);
+    
+            // Reset UI
+            installBtn.disabled = false;
+            installBtn.textContent = originalText;
+            updateServerView(); // Refresh button state (Install -> Update)
+        });
+    }
 
     // --- IPC Handlers ---
 
