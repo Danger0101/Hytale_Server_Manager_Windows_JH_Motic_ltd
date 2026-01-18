@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getServers: () => ipcRenderer.invoke('get-servers'),
   addServer: (serverData) => ipcRenderer.invoke('add-server', serverData),
   updateServer: (serverData) => ipcRenderer.invoke('update-server', serverData),
-  deleteServer: (serverId) => ipcRenderer.invoke('delete-server', serverId),
+  deleteServer: (data) => ipcRenderer.invoke('delete-server', data),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   openFolder: (path) => ipcRenderer.send('open-folder', path),
   openBackupFolder: (serverId) => ipcRenderer.invoke('open-backup-folder', serverId),
@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importFromLauncher: (serverId) => ipcRenderer.invoke('import-from-launcher', serverId),
   lookupHytalePlayer: (data) => ipcRenderer.invoke('lookup-hytale-player', data),
   reportPlayer: (serverId, playerId, reason) => ipcRenderer.invoke('report-hytale-player', { serverId, playerId, reason }),
+  checkHytaleVersion: (serverId) => ipcRenderer.invoke('check-hytale-version', serverId),
 
   // File Editing
   readFile: (data) => ipcRenderer.invoke('read-file', data),
