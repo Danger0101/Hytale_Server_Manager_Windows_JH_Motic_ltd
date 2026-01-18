@@ -129,6 +129,21 @@ ipcMain.on('open-folder', (event, folderPath) => {
     shell.openPath(folderPath);
 });
 
+ipcMain.handle('open-backup-folder', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return;
+
+    const backupPath = path.join(server.path, 'backups');
+    // Create it if it doesn't exist so the folder opens empty instead of erroring
+    try {
+        await fs.access(backupPath);
+    } catch {
+        await fs.mkdir(backupPath, { recursive: true });
+    }
+    shell.openPath(backupPath);
+});
+
 // --- Backup Logic ---
 ipcMain.handle('backup-server', async (event, serverId) => {
     const servers = await readServersConfig();
@@ -174,6 +189,17 @@ ipcMain.on('start-server', async (event, serverId) => {
         mainWindow.webContents.send('server-log', { serverId, log: `[Manager] Error: Server config not found for ID ${serverId}.\n` });
         return;
     }
+
+    // --- FIX: Implement Auto-Update Logic ---
+    if (serverConfig.autoUpdate && serverConfig.updateUrl) {
+        mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Auto-Update enabled. Checking for updates...\n' });
+        const downloadResult = await downloadServerJar(serverConfig, mainWindow);
+        mainWindow.webContents.send('server-log', { serverId, log: `[Manager] ${downloadResult.message}\n` });
+        if (!downloadResult.success) {
+            mainWindow.webContents.send('server-log', { serverId, log: '[Manager] Auto-Update failed. Starting server with existing file. Please check the Update URL.\n' });
+        }
+    }
+    // ----------------------------------------
     
     const args = (serverConfig.javaArgs || '').split(' ').filter(Boolean);
     
@@ -355,37 +381,34 @@ async function updatePlayerHistory(server, playerName, action) {
 }
 
 // --- INSTALLER / UPDATER LOGIC ---
-ipcMain.handle('install-server-jar', async (event, serverId) => {
-    const servers = await readServersConfig();
-    const server = servers.find(s => s.id === serverId);
-    
-    if (!server) return { success: false, message: 'Server not found.' };
-    if (!server.updateUrl) return { success: false, message: 'No Download URL set in server settings.' };
+async function downloadServerJar(server, mainWindow) {
+    if (!server) return { success: false, message: 'Server configuration not found.' };
+    if (!server.updateUrl) return { success: false, message: 'No Download URL is set in server settings.' };
 
     const jarPath = path.join(server.path, server.jarFile);
-    const backupPath = path.join(server.path, server.jarFile + '.bak');
+    const backupPath = `${jarPath}.bak`;
 
     // 1. BACKUP: If a jar already exists, rename it to .bak
     if (require('fs').existsSync(jarPath)) {
         try {
-            await fs.cp(jarPath, backupPath);
+            await fs.rename(jarPath, backupPath);
+             if (mainWindow) {
+                mainWindow.webContents.send('server-log', { serverId: server.id, log: `[Manager] Backed up existing ${server.jarFile} to ${server.jarFile}.bak.\n` });
+            }
         } catch (e) {
-            return { success: false, message: 'Backup failed (file might be in use): ' + e.message };
+            return { success: false, message: `Backup failed (file might be in use): ${e.message}` };
         }
     }
 
     // 2. DOWNLOAD: Fetch the new file
     return new Promise((resolve) => {
         const file = require('fs').createWriteStream(jarPath);
-        
         const request = https.get(server.updateUrl, (response) => {
-            // Check success
             if (response.statusCode !== 200) {
-                if(require('fs').existsSync(backupPath)) {
-                    // Restore backup if download fails
-                    require('fs').copyFileSync(backupPath, jarPath); 
+                if (require('fs').existsSync(backupPath)) {
+                    fs.rename(backupPath, jarPath); // Restore backup
                 }
-                resolve({ success: false, message: `Download failed (HTTP ${response.statusCode}). Check URL.` });
+                resolve({ success: false, message: `Download failed (HTTP ${response.statusCode}). Please check the Update URL.` });
                 return;
             }
 
@@ -393,18 +416,26 @@ ipcMain.handle('install-server-jar', async (event, serverId) => {
 
             file.on('finish', () => {
                 file.close();
-                resolve({ success: true, message: 'Download Complete! Server is ready.' });
+                if (require('fs').existsSync(backupPath)) {
+                    fs.unlink(backupPath, ()=>{}); // Clean up backup file silently
+                }
+                resolve({ success: true, message: 'Download Complete! Server is updated.' });
             });
         });
 
         request.on('error', (err) => {
-            // Restore backup on error
-            if(require('fs').existsSync(backupPath)) {
-                require('fs').copyFileSync(backupPath, jarPath);
+            if (require('fs').existsSync(backupPath)) {
+                fs.rename(backupPath, jarPath); // Restore backup
             }
-            resolve({ success: false, message: `Network Error: ${err.message}` });
+            resolve({ success: false, message: `Network Error during download: ${err.message}` });
         });
     });
+}
+
+ipcMain.handle('install-server-jar', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    return await downloadServerJar(server, mainWindow);
 });
 
 // --- CHECK IF INSTALLED ---
