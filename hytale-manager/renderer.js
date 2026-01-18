@@ -172,10 +172,17 @@ document.addEventListener('DOMContentLoaded', () => {
             merchantIdInput.value = server.merchantId || '';
             // Trigger visual state
             paymentSettings.style.display = server.enablePayments ? 'block' : 'none';
+            
+            // Load Tokens
+            document.getElementById('authSessionTokenInput').value = server.authSessionToken || '';
+            document.getElementById('authIdentityTokenInput').value = server.authIdentityToken || '';
         } else {
             modalTitle.textContent = 'Add a New Server';
             serverIdInput.value = '';
             discordWebhookInput.value = '';
+            // Clear them for new server
+            document.getElementById('authSessionTokenInput').value = '';
+            document.getElementById('authIdentityTokenInput').value = '';
         }
         modal.style.display = 'flex';
     }
@@ -488,7 +495,9 @@ function generateTextFromForm() {
             autoUpdate: autoUpdateCheckbox.checked,
             hytaleApiKey: hytaleApiKeyInput.value.trim(),
             enablePayments: enablePaymentsCheckbox.checked,
-            merchantId: merchantIdInput.value.trim()
+            merchantId: merchantIdInput.value.trim(),
+            authSessionToken: document.getElementById('authSessionTokenInput').value.trim(),
+            authIdentityToken: document.getElementById('authIdentityTokenInput').value.trim()
         };
 
         if (serverData.id) { // Update existing
