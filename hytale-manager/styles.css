@@ -254,3 +254,100 @@ html, body {
 #saveServerBtn:hover {
     background-color: var(--green-btn-hover);
 }
+
+/* --- Config Editor Styles --- */
+.config-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.view-toggle-btn {
+    background: transparent;
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.view-toggle-btn:hover {
+    background: var(--accent-color);
+    color: white;
+}
+
+/* Form Grid Layout */
+.config-form-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two columns of settings */
+    gap: 15px;
+    overflow-y: auto;
+    padding-right: 10px;
+    align-content: start;
+}
+
+.config-item {
+    background: var(--primary-bg);
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.config-item label {
+    font-size: 0.85rem;
+    color: var(--text-muted-color);
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.config-item input {
+    background: var(--secondary-bg);
+    border: 1px solid #444;
+    color: white;
+    padding: 8px;
+    border-radius: 3px;
+}
+
+.config-item input:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+/* Player Manager Styles */
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+}
+.tab-btn.active {
+    color: var(--accent-color);
+    border-bottom: 2px solid var(--accent-color);
+}
+.tab-btn:hover { color: white; }
+
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #333;
+}
+.player-item:hover { background-color: #2a2a2a; }
+
+.remove-player-btn {
+    background: transparent;
+    border: none;
+    color: #cc4444;
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+.remove-player-btn:hover { color: #ff0000; }
