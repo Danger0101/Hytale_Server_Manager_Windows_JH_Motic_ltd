@@ -7,10 +7,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateServer: (server) => ipcRenderer.invoke('update-server', server),
     deleteServer: (data) => ipcRenderer.invoke('delete-server', data),
     
-    // NEW: Auth Functions
-    authStartDeviceFlow: () => ipcRenderer.invoke('auth-start-device-flow'),
-    authPollToken: (code) => ipcRenderer.invoke('auth-poll-token', code),
-    
     // --- File System ---
     selectDirectory: () => ipcRenderer.invoke('select-directory'),
     selectFile: (filter) => ipcRenderer.invoke('select-file', filter),
@@ -47,9 +43,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkAotFile: (id) => ipcRenderer.invoke('check-aot-file', id),
     checkHytaleVersion: (id) => ipcRenderer.invoke('check-hytale-version', id),
 
-    // --- Hytale Web API ---
+    // --- Hytale Web API & Auth ---
     lookupHytalePlayer: (data) => ipcRenderer.invoke('lookup-hytale-player', data),
     reportPlayer: (id, uuid, reason) => ipcRenderer.invoke('report-hytale-player', {serverId: id, playerId: uuid, reason}),
+    authStartDeviceFlow: () => ipcRenderer.invoke('auth-start-device-flow'),
+    authPollToken: (code) => ipcRenderer.invoke('auth-poll-token', code),
 
     // --- Listeners (Main -> Renderer) ---
     onServerLog: (callback) => ipcRenderer.on('server-log', (_event, value) => callback(value)),
