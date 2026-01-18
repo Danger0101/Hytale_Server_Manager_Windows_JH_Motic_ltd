@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolder: (path) => ipcRenderer.send('open-folder', path),
   backupServer: (serverId) => ipcRenderer.invoke('backup-server', serverId),
 
+  // File Editing
+  readFile: (data) => ipcRenderer.invoke('read-file', data),
+  saveFile: (data) => ipcRenderer.invoke('save-file', data),
+
 
   // --- Server Interaction ---
   startServer: (serverId) => ipcRenderer.send('start-server', serverId),
