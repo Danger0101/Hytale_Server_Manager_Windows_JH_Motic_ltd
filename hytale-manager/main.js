@@ -111,8 +111,31 @@ ipcMain.handle('update-server', async (event, serverData) => {
     }
 });
 
-ipcMain.handle('delete-server', async (event, serverId) => {
+ipcMain.handle('delete-server', async (event, { serverId, deleteFiles }) => {
     let servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+
+    if (deleteFiles && server) {
+        try {
+            // Stop the server if it's running before deleting files
+            const serverProcess = runningServers.get(serverId);
+            if (serverProcess) {
+                await new Promise(resolve => {
+                    serverProcess.on('close', resolve);
+                    serverProcess.kill('SIGTERM'); // Force stop
+                });
+                runningServers.delete(serverId);
+            }
+            // Delete the directory
+            await fs.rm(server.path, { recursive: true, force: true });
+        } catch (err) {
+            console.error(`Failed to delete server files for ${serverId}:`, err);
+            // We can still proceed to remove it from the config,
+            // but we should let the user know something went wrong.
+            dialog.showErrorBox('Deletion Error', `Could not delete all server files at:\n${server.path}\n\nPlease remove them manually.\n\nError: ${err.message}`);
+        }
+    }
+
     servers = servers.filter(s => s.id !== serverId);
     await writeServersConfig(servers);
     return true;
@@ -234,7 +257,7 @@ ipcMain.on('start-server', async (event, serverId) => {
     mainWindow.webContents.send('server-state-change', { serverId, isRunning: true });
 
     // 1. Send START Notification (Green Color: 5763719)
-    // sendDiscordNotification is not defined in this file. Assuming it is defined elsewhere.
+    
     sendDiscordNotification(serverConfig.discordWebhook, `🟢 Server "${serverConfig.name}" is Starting...`, 5763719);
 
     serverProcess.stdout.on('data', (data) => {
@@ -260,7 +283,7 @@ ipcMain.on('start-server', async (event, serverId) => {
             const playerName = joinMatch[1];
             updatePlayerHistory(serverConfig, playerName, 'join');
             // Discord Alert
-            // sendDiscordNotification is not defined in this file. Assuming it is defined elsewhere.
+            
             sendDiscordNotification(serverConfig.discordWebhook, `👤 ${playerName} joined the server!`, 3447003);
         }
         if (leaveMatch) {
@@ -283,7 +306,7 @@ ipcMain.on('start-server', async (event, serverId) => {
         runningServers.delete(serverId);
         
         // 3. Send STOP Notification (Red Color: 15548997)
-        // sendDiscordNotification is not defined in this file. Assuming it is defined elsewhere.
+        
         sendDiscordNotification(serverConfig.discordWebhook, `🔴 Server "${serverConfig.name}" has stopped.`, 15548997);
     });
 
@@ -587,5 +610,36 @@ ipcMain.handle('report-hytale-player', async (event, { serverId, playerId, reaso
 });
 
 // --- Discord Helper ---
-// NOTE: The 'sendDiscordNotification' function is called but not defined in this file.
-// Ensure it is defined and available in the scope where it is being used.
+async function sendDiscordNotification(webhookUrl, message, color) {
+    if (!webhookUrl || webhookUrl.trim() === "") return;
+
+    const payload = {
+        embeds: [{
+            description: message,
+            color: color, // Decimal color code (e.g., Green: 5763719, Red: 15548997)
+            timestamp: new Date().toISOString()
+        }]
+    };
+
+    const url = new URL(webhookUrl);
+    const options = {
+        hostname: url.hostname,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const req = https.request(options, (res) => {
+        // We generally don't care about the response for notifications
+        // unless you want to log errors
+    });
+
+    req.on('error', (e) => {
+        console.error(`[Discord] Notification failed: ${e.message}`);
+    });
+
+    req.write(JSON.stringify(payload));
+    req.end();
+}
