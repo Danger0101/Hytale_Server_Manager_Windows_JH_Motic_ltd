@@ -208,11 +208,15 @@ html, body {
 }
 .modal-content {
     background-color: var(--secondary-bg);
-    padding: 2rem;
+    padding: 0; /* Removed padding to handle tabs better */
     border-radius: 8px;
     width: 90%;
-    max-width: 500px;
+    max-width: 600px; /* Slightly wider */
+    max-height: 85vh; /* Prevents it from going off-screen */
+    display: flex;
+    flex-direction: column;
     position: relative;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
 .close-button {
     position: absolute;
@@ -225,11 +229,6 @@ html, body {
 }
 .modal-content h2 {
     margin-bottom: 1.5rem;
-}
-.modal-content label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: var(--text-muted-color);
 }
 .modal-content input {
     width: 100%;
@@ -351,3 +350,80 @@ html, body {
     font-weight: bold;
 }
 .remove-player-btn:hover { color: #ff0000; }
+
+/* New: Scrollable Form Body */
+.modal-body {
+    padding: 2rem;
+    overflow-y: auto; /* Allows scrolling inside the modal */
+    flex-grow: 1;
+}
+
+/* New: Tab Navigation in Modal */
+.modal-tabs {
+    display: flex;
+    background-color: #252526;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 8px 8px 0 0;
+    padding: 0 10px;
+}
+
+.modal-tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    padding: 15px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: color 0.2s;
+    border-bottom: 3px solid transparent;
+}
+
+.modal-tab-btn:hover {
+    color: #fff;
+}
+
+.modal-tab-btn.active {
+    color: var(--accent-color);
+    border-bottom: 3px solid var(--accent-color);
+}
+
+/* Hide tab contents by default */
+.tab-content {
+    display: none;
+}
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Fix Inputs */
+.modal-content input[type="text"], 
+.modal-content input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background-color: #1a1a1a;
+    color: white;
+}
+
+/* Footer for Save Button */
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color);
+    background-color: #252526;
+    border-radius: 0 0 8px 8px;
+    text-align: right;
+}
+
+#saveServerBtn {
+    width: auto;
+    padding: 10px 30px;
+}
