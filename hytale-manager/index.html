@@ -28,12 +28,22 @@
         <div id="serverView" class="server-view" style="display: none;">
             <header class="header">
                 <h1 id="serverNameTitle"></h1>
-                <div class="controls">
-                    <button id="startButton">Start Server</button>
-                    <button id="stopButton">Stop Server</button>
-                    <button id="backupButton" style="background-color: #007acc; margin-left: 10px;">Backup World</button>
-                    <button id="deleteButton" style="background-color: #555; margin-left: 10px;">Delete Server</button>
+                <div id="uptimeBadge" style="display:none; background: #222; padding: 5px 10px; border-radius: 4px; border: 1px solid #444; font-family: monospace; color: #4CAF50;">
+                    Online: 00:00:00
                 </div>
+                <div class="controls">
+    <button id="startButton">Start Server</button>
+    <button id="stopButton">Stop Server</button>
+    <div style="margin-left: 20px; display: inline-block;">
+        <button id="editSettingsBtn" style="background-color: #f0ad4e; color: #fff;">Edit Settings</button>
+        <button id="configBtn" style="background-color: #5bc0de; color: #fff; margin-left: 5px;">Server Config</button>
+        <button id="playerManagerBtn" style="background-color: #6f42c1; color: #fff; margin-left: 5px;">Player Lists</button>
+    </div>
+    <div style="float: right;">
+        <button id="backupButton" style="background-color: #007acc;">Backup</button>
+        <button id="deleteButton" style="background-color: #555; margin-left: 5px;">Delete</button>
+    </div>
+</div>
             </header>
     
             <main class="console-container">
@@ -70,6 +80,12 @@
 
                 <label for="javaPath">Java Executable Path (optional)</label>
                 <input type="text" id="javaPathInput" placeholder="Leave blank to use bundled Java">
+
+                <label for="discordWebhook">Discord Webhook URL (optional)</label>
+                <input type="text" id="discordWebhookInput" placeholder="https://discord.com/api/webhooks/...">
+                <p style="font-size: 0.8em; color: #888; margin-top: -5px; margin-bottom: 10px;">
+                    Get this from Discord Server Settings > Integrations > Webhooks
+                </p>
                 
                 <button type="submit" id="saveServerBtn">Save Server</button>
             </form>
@@ -77,5 +93,62 @@
     </div>
 
     <script src="./renderer.js"></script>
+
+    <div id="configModal" class="modal" style="display: none;">
+    <div class="modal-content" style="width: 80%; max-width: 900px; height: 85vh; display: flex; flex-direction: column;">
+        <span class="close-config">&times;</span>
+        
+        <div class="config-toolbar">
+            <h2 style="margin:0;">Server Configuration</h2>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="configFileSelect" style="padding: 8px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;">
+                    <option value="server.properties">server.properties</option>
+                    <option value="config.json">config.json</option>
+                    <option value="world-settings.json">world-settings.json</option>
+                </select>
+                <button id="loadConfigBtn" style="padding: 8px 15px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px;">Load File</button>
+                <div style="width: 1px; height: 30px; background: #555; margin: 0 10px;"></div>
+                <button id="toggleViewBtn" class="view-toggle-btn">Switch to Text Mode</button>
+            </div>
+        </div>
+
+        <div id="configFormView" class="config-form-container" style="flex-grow: 1;">
+            <p style="grid-column: span 2; text-align: center; color: #888; margin-top: 50px;">
+                Load a file to see settings here.
+            </p>
+        </div>
+
+        <textarea id="configEditor" style="display: none; flex-grow: 1; background: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 15px; border: 1px solid #444; resize: none; line-height: 1.5;"></textarea>
+        
+        <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+            <button id="saveConfigBtn" style="padding: 12px 25px; background-color: var(--green-btn); color: white; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer;">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<div id="playerModal" class="modal" style="display: none;">
+    <div class="modal-content" style="width: 500px; height: 600px; display: flex; flex-direction: column;">
+        <span class="close-player">&times;</span>
+        <h2 style="margin-bottom: 15px;">Player Lists</h2>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px;">
+            <button class="tab-btn active" data-file="whitelist.json">Whitelist</button>
+            <button class="tab-btn" data-file="banned-players.json">Banned Players</button>
+            <button class="tab-btn" data-file="ops.json">Operators (Ops)</button>
+            <button class="tab-btn" data-file="player-history.json" style="color: #5bc0de;">History</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <input type="text" id="newPlayerInput" placeholder="Enter player name..." style="flex-grow: 1; padding: 8px; background: #222; border: 1px solid #444; color: white;">
+            <button id="addPlayerBtn" style="background: var(--green-btn); color: white; border: none; padding: 0 15px; cursor: pointer;">Add</button>
+        </div>
+
+        <div style="flex-grow: 1; overflow-y: auto; background: #1e1e1e; border: 1px solid #444; border-radius: 4px;">
+            <ul id="playerList" style="list-style: none; padding: 0;">
+                </ul>
+        </div>
+    </div>
+</div>
 </body>
 </html>
