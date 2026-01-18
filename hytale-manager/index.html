@@ -28,6 +28,11 @@
         <div id="serverView" class="server-view" style="display: none;">
             <header class="header">
                 <h1 id="serverNameTitle"></h1>
+                <div style="margin-left: 20px; font-size: 0.9rem; color: #aaa;">
+                    <span>IP: <strong id="publicIpLabel" style="color: white; cursor: copy;" title="Your Public IP">...</strong></span>
+                    <span style="margin: 0 10px;">|</span>
+                    <span id="aotStatusBadge">Checking...</span>
+                </div>
                 <div id="uptimeBadge" style="display:none; background: #222; padding: 5px 10px; border-radius: 4px; border: 1px solid #444; font-family: monospace; color: #4CAF50;">
                     Online: 00:00:00
                 </div>
@@ -58,98 +63,136 @@
         </div>
     </div>
 
-    <!-- Add/Edit Server Modal -->
-    <div id="serverModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2 id="modalTitle">Add a New Server</h2>
-            <form id="serverForm">
-                <input type="hidden" id="serverId">
-                <label for="serverName">Server Name</label>
-                <input type="text" id="serverNameInput" required placeholder="e.g., My Survival World">
-                
-                <label for="serverPath">Server Path</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="serverPathInput" required placeholder="e.g., C:\HytaleServers\Survival" style="flex-grow: 1;">
-                    <button type="button" id="browseBtn" style="padding: 0 15px; cursor: pointer;">Browse...</button>
-                </div>
-                
-                <label for="jarFile">JAR File Name</label>
-                <input type="text" id="jarFileInput" required value="hytale-server.jar">
-
-                <div style="margin-top: 15px; padding: 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px;">
-                    <h3 style="margin-top: 0; font-size: 0.9em; color: #aaa; border-bottom: 1px solid #444; padding-bottom: 5px;">Installation Source</h3>
-                    
-                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                        <button type="button" id="importFromLauncherBtn" style="background: #e67e22; color: white; border: none; padding: 8px 15px; cursor: pointer; flex-grow: 1;">
-                            📥 Import from Hytale Launcher
-                        </button>
-
-                        <button type="button" id="installCliBtn" style="background: #2980b9; color: white; border: none; padding: 8px 15px; cursor: pointer; flex-grow: 1;">
-                            ☁️ Hytale Downloader
-                        </button>
-                    </div>
-
-                    <p style="font-size: 0.75rem; color: #aaa; margin-top: 5px;">
-                        <span style="color: #e67e22;">recommended:</span> Copies files from your local game installation.<br>
-                        (Usually: %appdata%\Hytale\install\release\package\game\latest)
-                    </p>
-
-                    <div style="margin-top: 10px; border-top: 1px dashed #444; padding-top: 10px;">
-                        <label style="font-size: 0.8em; color: #666;">Or Custom Download URL:</label>
-                        <input type="text" id="updateUrlInput" placeholder="https://..." style="background: #222; border: 1px solid #333; color: #888;">
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; padding: 10px; background: #2a2a2a; border: 1px solid #6f42c1; border-radius: 4px;">
-                    <h3 style="margin-top: 0; font-size: 0.9em; color: #d0bfff; border-bottom: 1px solid #6f42c1; padding-bottom: 5px;">Hytale Cloud Services</h3>
-                    
-                    <label for="hytaleApiKey">Server API Key</label>
-                    <input type="password" id="hytaleApiKeyInput" placeholder="sk_live_..." style="background: #1a1a1a; border: 1px solid #444; color: white;">
-                    <p style="font-size: 0.75rem; color: #888; margin-top: 0; margin-bottom: 10px;">
-                        Required for UUID lookups, Telemetry, and Payments.
-                    </p>
-
-                    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                        <input type="checkbox" id="enablePaymentsCheckbox" style="width: auto; margin-right: 10px;">
-                        <label for="enablePaymentsCheckbox" style="margin: 0; color: #ffd700;">Enable Integrated Payments</label>
-                    </div>
-
-                    <div id="paymentSettings" style="display: none; margin-left: 20px; border-left: 2px solid #ffd700; padding-left: 10px;">
-                        <label for="merchantId">Merchant ID</label>
-                        <input type="text" id="merchantIdInput" placeholder="mer_123456789">
-                    </div>
-
-                    <div style="margin-top: 15px; border-top: 1px dashed #444; padding-top: 10px;">
-                        <h4 style="margin: 0 0 10px 0; color: #d0bfff;">Advanced Authentication (Method C)</h4>
-                        <p style="font-size: 0.75rem; color: #888; margin-bottom: 10px;">
-                            Leave blank to use interactive Console Auth. Use these tokens for automated/provider setups.
-                        </p>
-                        
-                        <label for="authSessionToken">Session Token (JWT)</label>
-                        <input type="password" id="authSessionTokenInput" placeholder="eyJ..." style="background: #1a1a1a; border: 1px solid #444; color: white; margin-bottom: 5px;">
-                        
-                        <label for="authIdentityToken">Identity Token (JWT)</label>
-                        <input type="password" id="authIdentityTokenInput" placeholder="eyJ..." style="background: #1a1a1a; border: 1px solid #444; color: white;">
-                    </div>
-                </div>
-
-                <label for="javaArgs">Java Arguments (optional)</label>
-                <input type="text" id="javaArgsInput" placeholder="-Xmx4G -Xms4G">
-
-                <label for="javaPath">Java Executable Path (optional)</label>
-                <input type="text" id="javaPathInput" placeholder="Leave blank to use bundled Java">
-
-                <label for="discordWebhook">Discord Webhook URL (optional)</label>
-                <input type="text" id="discordWebhookInput" placeholder="https://discord.com/api/webhooks/...">
-                <p style="font-size: 0.8em; color: #888; margin-top: -5px; margin-bottom: 10px;">
-                    Get this from Discord Server Settings > Integrations > Webhooks
-                </p>
-                
-                <button type="submit" id="saveServerBtn">Save Server</button>
-            </form>
+<div id="serverModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close-button" style="z-index: 10; top: 10px; right: 15px;">&times;</span>
+        
+        <div class="modal-tabs">
+            <button type="button" class="modal-tab-btn active" data-tab="tab-general">General</button>
+            <button type="button" class="modal-tab-btn" data-tab="tab-install">Installation</button>
+            <button type="button" class="modal-tab-btn" data-tab="tab-cloud">Cloud & Auth</button>
         </div>
+
+        <form id="serverForm" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="modal-body">
+                <input type="hidden" id="serverId">
+                <h2 id="modalTitle" style="margin-top:0;">Edit Server</h2>
+
+                <div id="tab-general" class="tab-content active">
+                    <label for="serverNameInput">Server Name</label>
+                    <input type="text" id="serverNameInput" required placeholder="e.g., My Survival World">
+                    
+                    <label for="serverPathInput">Server Path</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <input type="text" id="serverPathInput" required placeholder="C:\HytaleServers\Survival" style="flex-grow: 1; margin-bottom: 0;">
+                        <button type="button" id="browseBtn" style="padding: 0 15px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">Browse</button>
+                    </div>
+                    
+                    <label for="jarFileInput">JAR File Name</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="jarFileInput" required value="hytale-server.jar" style="flex-grow: 1;">
+                        <button type="button" id="jarBrowseBtn" style="padding: 0 15px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer;">Select File</button>
+                    </div>
+
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
+                        <label>Java Settings (Advanced)</label>
+                        
+                        <button type="button" id="checkJavaBtn" style="width: 100%; margin-bottom: 10px; background: #444; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">
+                            🔍 Check / Install Java 25
+                        </button>
+
+                        <input type="text" id="javaArgsInput" placeholder="Arguments (e.g. -Xmx4G)">
+                        <input type="text" id="javaPathInput" placeholder="Custom Java Path (Leave blank to use bundled)">
+                    </div>
+                </div>
+
+                <div id="tab-install" class="tab-content">
+                    <div style="background: #2a2a2a; border: 1px solid #444; border-radius: 4px; padding: 15px;">
+                        <h3 style="margin-top: 0; color: #fff;">Server Files</h3>
+                        <p style="color: #888; font-size: 0.9em; margin-bottom: 15px;">
+                            Choose how to get your server files. 
+                            <br><strong style="color: #e67e22;">Note:</strong> Clicking these will auto-save the server first.
+                        </p>
+
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button type="button" id="installCliBtn" style="background: #2980b9; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 4px; text-align: left;">
+                                ☁️ <strong>Hytale Downloader</strong><br>
+                                <span style="font-size: 0.8em; opacity: 0.8;">Download latest files directly from Hytale (Requires Auth).</span>
+                            </button>
+
+                            <button type="button" id="importFromLauncherBtn" style="background: #e67e22; color: white; border: none; padding: 12px; cursor: pointer; border-radius: 4px; text-align: left;">
+                                📥 <strong>Import from Launcher</strong><br>
+                                <span style="font-size: 0.8em; opacity: 0.8;">Copy files from your local game install.</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <label>Custom Update URL</label>
+                        <input type="text" id="updateUrlInput" placeholder="https://example.com/server.jar">
+                        
+                        <div style="display: flex; align-items: center; margin-top: 10px;">
+                            <input type="checkbox" id="autoUpdateCheckbox" style="width: auto; margin: 0 10px 0 0;">
+                            <label for="autoUpdateCheckbox" style="margin: 0;">Auto-update on start</label>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
+                        <h3 style="margin-top: 0; font-size: 1rem; color: #fff;">Network Setup</h3>
+                        
+                        <div style="display: flex; align-items: center; gap: 10px; background: #2a2a2a; padding: 15px; border-radius: 4px;">
+                            <div style="flex-grow: 1;">
+                                <strong>Windows Firewall Rule</strong>
+                                <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #aaa;">
+                                    Opens UDP Port 5520 so friends can join. Requires Admin approval.
+                                </p>
+                            </div>
+                            <button type="button" id="firewallBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">
+                                🛡️ Open Firewall Port
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-cloud" class="tab-content">
+                    <div style="background: #1e1e1e; border: 1px solid #6f42c1; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; color: #d0bfff;">Hytale API</h3>
+                        <label>Server API Key</label>
+                        <input type="password" id="hytaleApiKeyInput" placeholder="sk_live_...">
+                        
+                        <div style="display: flex; align-items: center; margin-top: 10px;">
+                            <input type="checkbox" id="enablePaymentsCheckbox" style="width: auto; margin: 0 10px 0 0;">
+                            <label for="enablePaymentsCheckbox" style="margin: 0; color: #ffd700;">Enable Payments</label>
+                        </div>
+                        <div id="paymentSettings" style="display: none; margin-top: 10px; padding-left: 10px; border-left: 2px solid #ffd700;">
+                            <input type="text" id="merchantIdInput" placeholder="Merchant ID" style="margin-bottom: 0;">
+                        </div>
+                    </div>
+
+                    <div style="background: #1e1e1e; border: 1px solid #444; border-radius: 4px; padding: 15px;">
+                        <h3 style="margin: 0 0 10px 0; color: #fff;">Authentication (Advanced)</h3>
+                        <p style="font-size: 0.8em; color: #888; margin-bottom: 10px;">
+                            For automated hosting. Leave blank for interactive mode.
+                        </p>
+                        <label>Session Token</label>
+                        <input type="password" id="authSessionTokenInput" placeholder="JWT Session Token">
+                        <label>Identity Token</label>
+                        <input type="password" id="authIdentityTokenInput" placeholder="JWT Identity Token">
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <label>Discord Webhook</label>
+                        <input type="text" id="discordWebhookInput" placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" id="saveServerBtn">Save Server</button>
+            </div>
+        </form>
     </div>
+</div>
 
     <script src="./renderer.js"></script>
 
