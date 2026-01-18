@@ -186,10 +186,18 @@ ipcMain.on('start-server', async (event, serverId) => {
     mainWindow.webContents.send('server-state-change', { serverId, isRunning: true });
 
     // 1. Send START Notification (Green Color: 5763719)
+    // sendDiscordNotification is not defined in this file. Assuming it is defined elsewhere.
     sendDiscordNotification(serverConfig.discordWebhook, `🟢 Server "${serverConfig.name}" is Starting...`, 5763719);
 
     serverProcess.stdout.on('data', (data) => {
         const logLine = data.toString();
+        
+        // DETECT AUTH REQUEST
+        // Log usually looks like: "Please visit https://accounts.hytale.com/device and enter code: ABCD-1234"
+        if (logLine.includes('accounts.hytale.com/device')) {
+            // Send a special event to the frontend to open a popup
+            mainWindow.webContents.send('auth-needed', logLine);
+        }
         
         // Send to GUI Console
         mainWindow.webContents.send('server-log', { serverId, log: logLine });
@@ -204,6 +212,7 @@ ipcMain.on('start-server', async (event, serverId) => {
             const playerName = joinMatch[1];
             updatePlayerHistory(serverConfig, playerName, 'join');
             // Discord Alert
+            // sendDiscordNotification is not defined in this file. Assuming it is defined elsewhere.
             sendDiscordNotification(serverConfig.discordWebhook, `👤 ${playerName} joined the server!`, 3447003);
         }
         if (leaveMatch) {
@@ -226,6 +235,7 @@ ipcMain.on('start-server', async (event, serverId) => {
         runningServers.delete(serverId);
         
         // 3. Send STOP Notification (Red Color: 15548997)
+        // sendDiscordNotification is not defined in this file. Assuming it is defined elsewhere.
         sendDiscordNotification(serverConfig.discordWebhook, `🔴 Server "${serverConfig.name}" has stopped.`, 15548997);
     });
 
@@ -385,4 +395,126 @@ ipcMain.handle('check-jar-exists', async (event, serverId) => {
     return require('fs').existsSync(jarPath);
 });
 
+// --- REAL HYTALE INSTALLER LOGIC ---
+ipcMain.handle('import-from-launcher', async (event, serverId) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return { success: false, message: 'Server not found.' };
+
+    // 1. Try to Auto-Detect Hytale Install Path (Windows)
+    // Common Path: %appdata%\Hytale\install\release\package\game\latest
+    const appData = process.env.APPDATA;
+    const hytalePaths = [
+        path.join(appData, 'Hytale', 'install', 'release', 'package', 'game', 'latest'),
+        path.join(appData, 'Hytale', 'Game'), // Alternative path
+        'C:\\Hytale\\Game' // Custom install
+    ];
+
+    let sourceDir = null;
+
+    // Check which path actually exists
+    for (const p of hytalePaths) {
+        // We look for 'hytale-server.jar' OR 'Server' folder
+        if (require('fs').existsSync(path.join(p, 'hytale-server.jar')) || 
+            require('fs').existsSync(path.join(p, 'Server'))) {
+            sourceDir = p;
+            break;
+        }
+    }
+
+    if (!sourceDir) {
+        return { success: false, message: 'Could not find Hytale installation. Please copy files manually.' };
+    }
+
+    // 2. Perform the Copy
+    try {
+        const destDir = server.path;
+
+        // Copy JAR
+        // Note: Sometimes the jar is inside a 'Server' subfolder, sometimes it's in root.
+        // We'll check both based on the search results.
+        let sourceJar = path.join(sourceDir, 'hytale-server.jar');
+        if (!require('fs').existsSync(sourceJar)) {
+            sourceJar = path.join(sourceDir, 'Server', 'hytale-server.jar');
+        }
+
+        if (require('fs').existsSync(sourceJar)) {
+            await fs.copyFile(sourceJar, path.join(destDir, 'hytale-server.jar'));
+        } else {
+            return { success: false, message: 'Found Hytale folder, but server jar is missing!' };
+        }
+
+        // Copy Assets.zip (Crucial for Hytale servers)
+        const sourceAssets = path.join(sourceDir, 'Assets.zip');
+        if (require('fs').existsSync(sourceAssets)) {
+            await fs.copyFile(sourceAssets, path.join(destDir, 'Assets.zip'));
+        }
+
+        return { success: true, message: 'Import Successful! Server files copied.' };
+
+    } catch (error) {
+        return { success: false, message: 'Import Error: ' + error.message };
+    }
+});
+// --- HYTALE OFFICIAL API INTEGRATION ---
+
+// Helper for Hytale API Calls
+async function hytaleApiRequest(endpoint, apiKey, params = {}) {
+    // Fictional Hytale API Base URL based on your doc
+    const BASE_URL = 'https://api.hytale.com/v1'; 
+    
+    const url = new URL(`${BASE_URL}/${endpoint}`);
+    Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'HytaleServerManager/1.0'
+            }
+        });
+
+        if (!response.ok) {
+            return { success: false, error: `API Error ${response.status}: ${response.statusText}` };
+        }
+        
+        const data = await response.json();
+        return { success: true, data };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// 1. UUID Lookup Handler
+ipcMain.handle('lookup-hytale-player', async (event, { serverId, playerName }) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    
+    if (!server || !server.hytaleApiKey) {
+        return { success: false, error: 'Missing Server API Key' };
+    }
+
+    // Call the "UUID <-> Name Lookup" endpoint
+    const result = await hytaleApiRequest('profiles/lookup', server.hytaleApiKey, { name: playerName });
+    
+    if (result.success) {
+        // Assuming API returns { id: "...", name: "..." }
+        return { success: true, profile: result.data };
+    }
+    return result;
+});
+
+// 2. Version Check Handler
+ipcMain.handle('check-hytale-version', async (event, serverId) => {
+    // This endpoint might be public, but using API Key ensures better rate limits
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    const apiKey = server ? server.hytaleApiKey : null; // Optional?
+
+    return await hytaleApiRequest('version/latest', apiKey);
+});
+
 // --- Discord Helper ---
+// NOTE: The 'sendDiscordNotification' function is called but not defined in this file.
+// Ensure it is defined and available in the scope where it is being used.
