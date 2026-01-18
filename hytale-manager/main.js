@@ -180,7 +180,29 @@ ipcMain.on('start-server', async (event, serverId) => {
     // USE THE NEW FUNCTION HERE
     const javaExec = getJavaExecutable(serverConfig);
 
-    const serverProcess = spawn(javaExec, [...args, '-jar', serverConfig.jarFile], { cwd: serverConfig.path });
+    // 1. Prepare Environment Variables
+    // We clone the current process environment so we don't lose system paths
+    const serverEnv = { ...process.env };
+
+    // Inject Hytale API Key (Enables Telemetry & UUID Lookups on the server side)
+    if (serverConfig.hytaleApiKey) {
+        console.log(`[Manager] Injecting API Key for Server ${serverId}`);
+        serverEnv['HYTALE_API_KEY'] = serverConfig.hytaleApiKey;
+    }
+
+    // Inject Payment Settings
+    if (serverConfig.enablePayments) {
+        serverEnv['HYTALE_PAYMENTS_ENABLED'] = 'true';
+        if (serverConfig.merchantId) {
+            serverEnv['HYTALE_MERCHANT_ID'] = serverConfig.merchantId;
+        }
+    }
+
+    // 2. Launch the Server with the new Environment
+    const serverProcess = spawn(javaExec, [...args, '-jar', serverConfig.jarFile], { 
+        cwd: serverConfig.path,
+        env: serverEnv // <--- IMPORTANT: Pass the environment here
+    });
     
     runningServers.set(serverId, serverProcess);
     mainWindow.webContents.send('server-state-change', { serverId, isRunning: true });
@@ -513,6 +535,24 @@ ipcMain.handle('check-hytale-version', async (event, serverId) => {
     const apiKey = server ? server.hytaleApiKey : null; // Optional?
 
     return await hytaleApiRequest('version/latest', apiKey);
+});
+
+// Add this near your other Hytale API handlers
+ipcMain.handle('report-hytale-player', async (event, { serverId, playerId, reason }) => {
+    const servers = await readServersConfig();
+    const server = servers.find(s => s.id === serverId);
+    
+    if (!server || !server.hytaleApiKey) {
+        return { success: false, error: 'Server API Key is required to submit reports.' };
+    }
+
+    // Call the Hytale "Report" endpoint
+    // Note: 'playerId' should be the UUID, not the name
+    return await hytaleApiRequest('reports/submit', server.hytaleApiKey, { 
+        targetId: playerId,
+        reason: reason,
+        timestamp: new Date().toISOString()
+    });
 });
 
 // --- Discord Helper ---
